@@ -130,12 +130,6 @@ The Docker container includes:
 - **Python 3** with Flask, PyPDF2, isbnlib
 - **PDF.js** - In-browser PDF rendering
 
-## Design Philosophy
-
-- Monospace fonts (Monaco/Consolas)
-- 2px solid black borders
-- No rounded corners
-- Minimal color palette
 - Books as objects, not lists
 - Fast, direct interactions
 
