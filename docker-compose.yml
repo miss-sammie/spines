@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  spines:
+    build: .
+    container_name: spines-server
+    ports:
+      # Bind to all interfaces for tailnet access
+      - "0.0.0.0:8888:8888"
+    volumes:
+      # Mount your actual books directory here
+      - ./test_books:/app/books
+      # Data persistence
+      - spines_data:/app/data
+      # Optional: mount your real library
+      # - /path/to/your/real/books:/app/books:ro
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+    restart: unless-stopped
+    networks:
+      - spines-network
+
+volumes:
+  spines_data:
+    driver: local
+
+networks:
+  spines-network:
+    driver: bridge 
