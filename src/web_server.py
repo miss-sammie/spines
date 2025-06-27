@@ -2675,14 +2675,28 @@ body {
                     const canvas = document.createElement('canvas');
                     const context = canvas.getContext('2d');
                     
+                    // Get device pixel ratio for crisp rendering on high-DPI displays
+                    const devicePixelRatio = window.devicePixelRatio || 1;
+                    
                     // Calculate scale for responsive rendering
                     const viewport = page.getViewport({ scale: 1 });
                     const containerWidth = container.clientWidth || 800;
-                    const scale = Math.min(1.8, containerWidth / viewport.width); // Slightly higher quality
-                    const scaledViewport = page.getViewport({ scale: scale });
+                    const baseScale = Math.min(1.8, containerWidth / viewport.width);
                     
+                    // Scale for both responsive sizing AND device pixel density
+                    const renderScale = baseScale * devicePixelRatio;
+                    const scaledViewport = page.getViewport({ scale: renderScale });
+                    
+                    // Set canvas backing store size (actual pixel dimensions)
                     canvas.height = scaledViewport.height;
                     canvas.width = scaledViewport.width;
+                    
+                    // Set canvas CSS size (visual dimensions)
+                    const displayWidth = scaledViewport.width / devicePixelRatio;
+                    const displayHeight = scaledViewport.height / devicePixelRatio;
+                    canvas.style.width = displayWidth + 'px';
+                    canvas.style.height = displayHeight + 'px';
+                    
                     canvas.className = 'pdf-page';
                     canvas.style.opacity = '0';
                     canvas.style.transition = 'opacity 0.3s ease';
