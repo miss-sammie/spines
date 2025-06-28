@@ -28,15 +28,16 @@ docker-compose up
 Your spines library will be accessible at `http://localhost:8888`
 
 ### 2. Add books through the web interface
+![Screenshot 2025-06-28 120122](https://github.com/user-attachments/assets/16227ea9-0b27-4f69-81ed-f1156e1ed9b8)
+
 
 **Drag & Drop**: Simply drag PDF files directly into your browser window. They'll be processed automatically and added to your library. This creates a folder with a normalized filename for the PDF, which changes in real time as you add metadata like author and ISBN. 
 
 **Manual Review Queue**: After processing, books enter a review queue where you can:
 - Verify auto-detected metadata (title, author, year, ISBN)
-- Set media type (book, article, zine, etc.)
+- PDF preview for quickly finding ISBN
 - Add contributors and tags
 - Mark reading status
-
 
 
 ### 3. Or use the CLI for batch processing
