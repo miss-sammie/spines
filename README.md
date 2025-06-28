@@ -1,12 +1,19 @@
 # spines
 
-*a local digital library hosted on whisper's computer*
+*a library service hosted on whisper and hal’s homelab*
 
-when couples move in together, sometimes they merge their book shelves. what would it feel like to take our piles of dusty pdfs buried in the file system of our computers and held hostage by google, and give them some care and intention before placing them on a digital shelf together? 
+ 
+when couples move in together, sometimes they merge their book shelves. what would it feel like to take our piles of dusty pdfs held hostage in proprietary apps, and made a space where they could be held with more care. 
 
-right now it is hosted on a tailnet, so only members of the network can access the site. we dream of hosting a webserver feeling more like hosting a guest. serving files like serving cake. 
+the software is janky and vibe coded, but it made the difficult task of normalizing file names and gathering metadata extremely fluid
 
-xoxo hwwh 
+the result is a cleanly organized folder of our books, with library and book level metadata stored in JSON files, all of which can easily migrate to more stable future interfaces. 
+
+right now it is hosted on a tailnet, so only friends who are members of the network can access the site. 
+
+we dream of hosting a webserver feeling more like hosting a guest. serving files like serving cake.
+
+xoxo hwwh
 
 ## Quick Start
 
