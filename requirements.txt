@@ -1,0 +1,24 @@
+# Core dependencies for spines phase 1
+# PDF and ebook processing
+pypdf2==3.0.1
+ebooklib==0.18
+isbnlib==3.10.14
+
+# CLI and file handling
+click==8.1.7
+python-magic==0.4.27
+beautifulsoup4==4.12.3
+lxml==5.1.0
+watchdog==4.0.0
+
+# Web interface and API requests
+Jinja2==3.1.3
+flask==3.0.0
+requests==2.31.0
+
+# OCR support (Tesseract installed via apt)
+pytesseract==0.3.10
+Pillow==10.2.0
+
+# Archive handling
+py7zr==0.20.8 

@@ -13,7 +13,7 @@ const CloudSky = ({ children }) => {
       let clouds = [];
       let cloudImg = null;
       let imageLoaded = false;
-      const numClouds = 8;
+      const numClouds = 16;
 
       p.setup = async () => {
         try {
