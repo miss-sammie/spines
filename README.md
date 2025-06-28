@@ -1,6 +1,7 @@
 # spines
 
 *a library service hosted on whisper and hal’s homelab*
+![Screenshot 2025-06-28 113947](https://github.com/user-attachments/assets/41e2d73c-e59a-4230-ae39-8edfd3c361ac)
 
  
 when couples move in together, sometimes they merge their book shelves. what would it feel like to take our piles of dusty pdfs held hostage in proprietary apps, and made a space where they could be held with more care. 
