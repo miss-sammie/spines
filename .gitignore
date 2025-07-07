@@ -142,3 +142,11 @@ dmypy.json
 *.pem
 *.key
 secrets/ 
+
+# Werkzeug cache files
+.webassets-cache
+.sass-cache
+
+# Spines-specific
+docker-compose.migration.yml
+REFACTOR_PLAN.md 
