@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  spines-2:
+    build: .
+    container_name: spines-2-server
+    ports:
+      - "8890:8888"  # Main application (v2.0 on port 8890)
+    volumes:
+      # Books library
+      - ./books:/app/books:rw
+      # Data persistence
+      - ./data:/app/data:rw
+      - ./logs:/app/logs:rw
+      # For development: mount source code for hot reload
+      - ./src:/app/src:rw
+      - ./static:/app/static:rw
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - SPINES_LOG_LEVEL=INFO
+      - SPINES_ACCESS_MODE=local
+      - SPINES_PUBLIC_READ_ONLY=false
+      - SPINES_ADMIN_USERS=hal,whisper
+    restart: unless-stopped
+    networks:
+      - spines-network
+
+networks:
+  spines-network:
+    driver: bridge 

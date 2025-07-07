@@ -1,0 +1,286 @@
+/* spines - hypercard inspired review queue */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    background: #f0f0f0;
+    color: #000;
+    line-height: 1.4;
+    font-size: 12px;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    border: 2px solid black;
+    padding: 20px;
+    margin-bottom: 20px;
+    background: white;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-left h1 {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.header-left .subtitle {
+    font-size: 14px;
+    color: #666;
+}
+
+.nav-links {
+    display: flex;
+    gap: 15px;
+}
+
+.nav-links a {
+    color: #0066cc;
+    text-decoration: none;
+    font-size: 12px;
+}
+
+.nav-links a:hover {
+    text-decoration: underline;
+}
+
+.queue-summary {
+    border: 2px solid black;
+    background: white;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+}
+
+.stat-card {
+    border: 1px solid black;
+    padding: 10px;
+    text-align: center;
+    background: #f8f8f8;
+}
+
+.stat-number {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 3px;
+}
+
+.stat-label {
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.review-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+    gap: 20px;
+}
+
+.review-item {
+    border: 2px solid black;
+    background: white;
+    padding: 20px;
+    position: relative;
+}
+
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ccc;
+}
+
+.review-title {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.review-meta {
+    font-size: 10px;
+    color: #666;
+}
+
+.review-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn {
+    border: 1px solid black;
+    background: white;
+    padding: 4px 8px;
+    font-family: inherit;
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background: #f0f0f0;
+}
+
+.btn.primary {
+    background: #0066cc;
+    color: white;
+    border-color: #0066cc;
+}
+
+.metadata-editor {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 8px 15px;
+    margin-bottom: 15px;
+}
+
+.metadata-label {
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.metadata-input {
+    border: 1px solid #ccc;
+    padding: 4px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    width: 100%;
+}
+
+.metadata-input:focus {
+    border-color: #0066cc;
+    outline: none;
+}
+
+.pdf-preview {
+    width: 100%;
+    height: 400px;
+    border: 1px solid #ccc;
+    margin-bottom: 15px;
+}
+
+.process-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 15px;
+    border-top: 1px solid #ccc;
+}
+
+.contributor-input {
+    border: 1px solid black;
+    padding: 4px 8px;
+    font-family: inherit;
+    font-size: 11px;
+    width: 120px;
+}
+
+.process-btn {
+    border: 2px solid #006600;
+    background: #006600;
+    color: white;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.process-btn:hover {
+    background: #004400;
+}
+
+.process-btn:disabled {
+    background: #ccc;
+    border-color: #ccc;
+    cursor: not-allowed;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.reject-btn {
+    border: 2px solid #cc0000;
+    background: white;
+    color: #cc0000;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.reject-btn:hover {
+    background: #cc0000;
+    color: white;
+}
+
+.reject-btn:disabled {
+    background: #ccc;
+    border-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+}
+
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.feedback {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 10px 15px;
+    border: 2px solid;
+    background: white;
+    font-size: 12px;
+    z-index: 1000;
+}
+
+.feedback.success {
+    border-color: #006600;
+    color: #006600;
+    background: #e8f5e8;
+}
+
+.feedback.error {
+    border-color: #cc0000;
+    color: #cc0000;
+    background: #ffe8e8;
+}
+
+.empty-state {
+    border: 2px solid black;
+    background: white;
+    padding: 40px;
+    text-align: center;
+}
+
+.empty-state h2 {
+    margin-bottom: 10px;
+} 

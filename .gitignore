@@ -1,0 +1,144 @@
+# Spines 2.0 - Book library management system
+# Ignore patterns for the modular architecture
+
+# Book library directories - these contain the actual PDFs and processed data
+books/
+test_books/
+data/
+
+# Temporary processing files
+temp/
+*.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Logs
+*.log
+logs/
+
+# Database files (if using SQLite locally)
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Generated static files (if we auto-generate)
+static/generated/
+
+# OCR processing outputs (these get regenerated)
+*.txt
+*.html
+ocr_output/
+
+# Backup files
+*.bak
+*.backup
+
+# Large media files (actual books - these should be managed separately)
+*.pdf
+*.epub
+*.mobi
+*.djvu
+*.azw
+*.azw3
+
+# Spines 2.0 specific patterns
+# Migration artifacts
+migration_backup/
+v1_backup/
+
+# Service layer cache files
+src/services/*.cache
+src/services/__pycache__/
+
+# API response cache
+api_cache/
+
+# Static asset builds (if we add build process)
+static/dist/
+static/build/
+
+# Test files and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Node.js (if we add any frontend build tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local development overrides
+docker-compose.override.yml
+local.env
+
+# Jupyter notebooks (if used for analysis)
+.ipynb_checkpoints/
+
+# mypy type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Profiling data
+*.prof
+
+# Security
+*.pem
+*.key
+secrets/ 

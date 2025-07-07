@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  spines-2:
+    build: .
+    container_name: spines-2-migration
+    ports:
+      - "8890:8888"  # Different port to avoid conflict with v1
+    volumes:
+      # Mount v1 data as read-only for migration
+      - ../spines/test_books:/app/migration/v1-books:ro
+      - ../spines/data:/app/migration/v1-data:ro
+      # Mount v2 data directories
+      - ./books:/app/books:rw
+      - ./data:/app/data:rw
+      - ./logs:/app/logs:rw
+    environment:
+      - SPINES_MIGRATION_MODE=true
+      - SPINES_V1_BOOKS_PATH=/app/migration/v1-books
+      - SPINES_V1_DATA_PATH=/app/migration/v1-data
+      - SPINES_ACCESS_MODE=local
+      - SPINES_LOG_LEVEL=INFO
+    networks:
+      - spines-migration
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  spines-migration:
+    driver: bridge 
