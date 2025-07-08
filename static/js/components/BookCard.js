@@ -109,7 +109,7 @@ class BookCard {
                     ${b.year? metaRow('year','year',b.year,'number'):''}
                     ${b.isbn? metaRow('isbn','isbn',b.isbn):''}
                     ${metaRow('publisher','publisher',b.publisher)}
-                    ${metaRow('media type','media_type',b.media_type)}
+                    ${metaRow('media type','media_type',b.media_type,'select')}
                     ${metaRow('contributors','contributor',formatArr(b.contributor),'array')}
                     ${metaRow('read by','read_by',formatArr(b.readers||b.read_by),'array')}
                     ${metaRow('tags','tags',formatArr(b.tags),'array')}

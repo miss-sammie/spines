@@ -122,12 +122,29 @@ class MetadataEditor {
                 input.value = currentValue || '';
                 break;
                 
+            case 'select': // enum/select dropdown
+                input = document.createElement('select');
+                // Use provided options or fallback defaults
+                const opts = (this.options.mediaTypeOptions || ['book', 'article', 'web', 'unknown']);
+                opts.forEach(opt => {
+                    const optionEl = document.createElement('option');
+                    optionEl.value = opt;
+                    optionEl.textContent = opt;
+                    if ((currentValue || '').toLowerCase() === opt.toLowerCase()) {
+                        optionEl.selected = true;
+                    }
+                    input.appendChild(optionEl);
+                });
+                break;
+
             default: // text
                 input = document.createElement('input');
                 input.type = 'text';
                 input.value = currentValue || '';
                 break;
         }
+        
+        // (auto-completion for contributors/read_by removed as per user request)
         
         input.className = 'metadata-input';
         input.dataset.field = fieldName;

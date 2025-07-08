@@ -484,6 +484,12 @@ class MetadataExtractor:
                             
                             confidence += 0.5  # ISBN lookup is VERY valuable
                             print(f"📚 Enhanced with ISBN lookup: {isbn_metadata.get('title', 'N/A')}")
+                        else:
+                            # No metadata returned – treat ISBN as unverified and fall back to review queue
+                            print(f"  ❌ No metadata found for ISBN {isbn} – discarding ISBN and lowering confidence")
+                            metadata.pop("isbn", None)
+                            isbn_found = False
+                            confidence = max(confidence - 0.3, 0.1)
                 
                 # OPTIMIZATION: Only do full text extraction if we have high confidence or need it
                 # Skip full text extraction if we found a good ISBN and have decent metadata
@@ -604,6 +610,11 @@ class MetadataExtractor:
                         
                         confidence += 0.4  # ISBN lookup is VERY valuable
                         print(f"📚 Enhanced with ISBN lookup: {isbn_metadata.get('title', 'N/A')}")
+                    else:
+                        print(f"  ❌ No metadata found for ISBN {metadata['isbn']} – discarding ISBN and lowering confidence")
+                        metadata.pop('isbn', None)
+                        isbn_found = False
+                        confidence = max(confidence - 0.3, 0.1)
                 
                 return ExtractionResult(
                     method=ExtractionMethod.CALIBRE,
@@ -1727,6 +1738,11 @@ class MetadataExtractor:
                                 if isbn_metadata:
                                     metadata.update(isbn_metadata)
                                     confidence += 0.2
+                                else:
+                                    print(f"  ❌ No metadata found for ISBN {isbn} – discarding ISBN and lowering confidence")
+                                    metadata.pop('isbn', None)
+                                    isbn_found = False
+                                    confidence = max(confidence - 0.3, 0.1)
                 
                 return ExtractionResult(
                     method=ExtractionMethod.CALIBRE,

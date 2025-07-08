@@ -36,6 +36,7 @@ def setup_logging(log_level='INFO'):
     
     # Reduce noise from some libraries
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
+    logging.getLogger('PyPDF2._cmap').setLevel(logging.ERROR)
     
     return root_logger
 
