@@ -53,7 +53,7 @@ class BookCard {
         // default 'spine' / 'icon' (icon currently same as spine minus meta)
         return this.renderSpine();
 
-    }
+    }3
 
     renderSpine() {
         const b = this.book;
@@ -106,7 +106,7 @@ class BookCard {
             <div class="metadata-content">
                 <div class="metadata-grid">
                     ${metaRow('author','author',b.author)}
-                    ${b.year? metaRow('year','year',b.year,'number'):''}
+                    ${metaRow('year','year',b.year,'number')}
                     ${b.isbn? metaRow('isbn','isbn',b.isbn):''}
                     ${metaRow('publisher','publisher',b.publisher)}
                     ${metaRow('media type','media_type',b.media_type,'select')}
@@ -371,7 +371,10 @@ class BookCard {
         if (instance.options.variant === 'full' && typeof MetadataEditor !== 'undefined') {
             const containerId = targetElement.id || 'bookDetail';
             try {
-                new MetadataEditor(containerId, { apiEndpoint: instance.options.booksApiUrl });
+                new MetadataEditor(containerId, { 
+                    apiEndpoint: instance.options.booksApiUrl,
+                    autoSave: false  // disable debounced autosave, only save on blur/enter/tab
+                });
             } catch (err) {
                 console.warn('BookCard: failed to init MetadataEditor', err);
             }
