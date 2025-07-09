@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ book.title or 'Untitled' }} - spines 2.0</title>
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/reader.css">
+    <style>
+        /* Reader-specific styles */
+        .content-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            text-decoration: none;
+            color: black;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .book-detail {
+            border: 2px solid black;
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .book-detail.collapsed {
+            padding: 10px 20px;
+        }
+        
+        .book-detail.collapsed .metadata-content {
+            display: none;
+        }
+        
+        .book-detail.collapsed .functions-section {
+            display: none;
+        }
+        
+        .collapse-toggle {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            cursor: pointer;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 18px;
+            font-weight: bold;
+            user-select: none;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border: 1px solid black;
+        }
+        
+        .collapse-toggle:hover {
+            background: #f0f0f0;
+        }
+        
+        .book-detail h2 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 8px 15px;
+            margin-top: 15px;
+        }
+        
+        .metadata-label {
+            font-weight: bold;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .metadata-value {
+            font-size: 12px;
+            word-break: break-word;
+        }
+        
+        .readonly {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .functions-section {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 15px;
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin: 0 0 10px 0;
+        }
+        
+        .function-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .function-button {
+            padding: 8px 12px;
+            border: 1px solid black;
+            background: white;
+            cursor: pointer;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 11px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .function-button:hover {
+            background: #f0f0f0;
+        }
+        
+        .function-button.delete {
+            background: #ffebee;
+            border-color: #d32f2f;
+            color: #d32f2f;
+        }
+        
+        .function-button.delete:hover {
+            background: #ffcdd2;
+        }
+        
+        .pdf-pages-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .pdf-page {
+            display: block;
+            margin: 0 auto 20px auto;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 100%;
+            height: auto;
+        }
+        
+        #loadingStatus {
+            text-align: center;
+            padding: 40px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .save-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            background: #4caf50;
+            color: white;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .content-container,
+            .pdf-pages-container {
+                padding: 10px;
+            }
+            
+            .metadata-grid {
+                grid-template-columns: 100px 1fr;
+                gap: 5px 10px;
+            }
+            
+            .function-buttons {
+                flex-direction: column;
+            }
+            
+            .function-button {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Book components -->
+    <script src="/static/js/components/BookCard.js"></script>
+    <script src="/static/js/components/MetadataEditor.js"></script>
+    <script src="/static/js/utils/BookActions.js"></script>
+    <!-- Reader component and dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <script src="/static/js/components/Reader.js"></script>
+</head>
+<body>
+    <div class="content-container">
+        <a href="/" class="back-link" onclick="navigateBackToLibrary(event)">← back to library</a>
+        
+        <!-- embed raw book JSON -->
+        <script id="bookDataJson" type="application/json">{{ book|tojson|safe }}</script>
+
+        <!-- Book detail component will mount here -->
+        <div id="bookDetail"></div>
+    </div>
+
+    <!-- Reader modal container IS NOW THE MAIN CONTENT AREA -->
+    <div id="reader-container" class="reader-inline-container"></div>
+    
+    <div class="save-status" id="saveStatus" style="display: none;">
+        💾 saving...
+    </div>
+    
+    <script>
+        const bookData = JSON.parse(document.getElementById('bookDataJson').textContent);
+        const bookId = bookData.id;
+        let metadataCollapsed = false;
+        
+        // Toggle metadata visibility
+        function toggleMetadata() {
+            const bookDetail = document.getElementById('bookDetail');
+            const collapseToggle = document.getElementById('collapseToggle');
+            
+            metadataCollapsed = !metadataCollapsed;
+            
+            if (metadataCollapsed) {
+                bookDetail.classList.add('collapsed');
+                collapseToggle.textContent = '+';
+            } else {
+                bookDetail.classList.remove('collapsed');
+                collapseToggle.textContent = '–';
+            }
+        }
+        
+        // Navigation function
+        function navigateBackToLibrary(event) {
+            event.preventDefault();
+            const timestamp = new Date().getTime();
+            window.location.href = `/?t=${timestamp}`;
+        }
+        
+        // Load the book into the reader on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Mount BookCard full variant and auto-init MetadataEditor
+            BookCard.mount(document.getElementById('bookDetail'), bookData, { variant: 'full', enableEditing: false });
+            
+            // Instantiate the Reader component and load the current book
+            window.spinesReader = new Reader('reader-container', { isInline: true });
+            window.spinesReader.show(bookId);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Review Queue – Spines 2.0</title>
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/review-queue.css">
+    <script src="/static/js/components/BookCard.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>review queue</h1>
+                    <div class="subtitle">manual review for uncertain metadata</div>
+                </div>
+                <div class="nav-links">
+                    <a href="/">← back to library</a>
+                    <a href="/ocr-management">ocr queue</a>
+                </div>
+            </div>
+        </header>
+
+        <div class="queue-summary">
+            <div class="summary-grid" id="summaryGrid"></div>
+        </div>
+
+        <div class="review-items" id="reviewItems"></div>
+        <div class="empty-state" id="emptyState" style="display:none;">
+            <h2>no items need review</h2>
+            <p>All books are either processed automatically or in the OCR queue.</p>
+        </div>
+    </div>
+
+    <script src="/static/js/pages/review-queue.js"></script>
+</body>
+</html> 

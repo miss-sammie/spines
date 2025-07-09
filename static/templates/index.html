@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>spines 2.0</title>
+    
+    <!-- p5.js for CloudSky -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    
+    <!-- Our beautiful CSS -->
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+</head>
+<body>
+    <!-- Cloud sky background -->
+    <div id="cloudSky"></div>
+    
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>spines 2.0</h1>
+                    <div class="subtitle">{{ access_mode }} mode • {{ book_count }} books</div>
+                </div>
+                <div class="header-right">
+                    <label for="contributor">contributor:</label>
+                    <input type="text" id="contributor" placeholder="your name" value="{{ contributor or '' }}">
+                </div>
+            </div>
+        </header>
+        
+        <!-- Status notice -->
+        {% if is_public %}
+        <div class="review-notice">
+            <strong>🌐 Public Library Access</strong>
+            <br>
+            You're viewing the public library. Connect via Tailscale for full access to upload and edit books.
+        </div>
+        {% endif %}
+        
+        <!-- File changes notice -->
+        {% if not is_public and total_changes > 0 %}
+        <div class="changes-notice">
+            <strong>📚 {{ total_changes }} file{{ 's' if total_changes != 1 else '' }} need processing</strong>
+            <br>
+            <button class="process-button" onclick="processFiles()">process now</button>
+            <span class="process-status" id="processStatus"></span>
+            <div class="process-progress" id="processProgress" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="processProgressFill"></div>
+                </div>
+                <div class="progress-details" id="progressDetails"></div>
+                <div class="file-list" id="fileList"></div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Review queue notice -->
+        {% if not is_public and pending_review > 0 %}
+        <div class="review-notice">
+            <strong>📋 {{ pending_review }} book{{ 's' if pending_review != 1 else '' }} need manual review</strong>
+            <br>
+            <a href="/admin/review-queue" class="review-link">review metadata →</a>
+        </div>
+        {% endif %}
+        
+        <!-- Upload zone (only for non-public access) -->
+        {% if not is_public %}
+        <div class="upload-zone" id="uploadZone">
+            <!-- UploadZone component will populate this -->
+        </div>
+        {% endif %}
+        
+        <!-- Processing queue (only for non-public access) -->
+        {% if not is_public %}
+        <div class="processing-queue" id="processingQueue">
+            <!-- ProcessingQueue component will populate this -->
+        </div>
+        {% endif %}
+        
+        <!-- Book grid -->
+        <div id="bookGrid">
+            <!-- BookGrid component will populate this -->
+        </div>
+        
+        <!-- Footer -->
+        <footer>
+            we love you!!
+        </footer>
+    </div>
+    
+    <!-- Our beautiful JavaScript components -->
+    <script src="/static/js/components/CloudSky.js"></script>
+    <script src="/static/js/components/UploadZone.js"></script>
+    <!-- BookCard extracted component -->
+    <script src="/static/js/components/BookCard.js"></script>
+    <script src="/static/js/components/BookGrid.js"></script>
+    <script src="/static/js/components/ProcessingQueue.js"></script>
+    <script src="/static/js/main.js"></script>
+    
+    <script>
+        // File processing functionality
+        async function processFiles() {
+            const contributor = document.getElementById('contributor').value || 'anonymous';
+            const processButton = document.querySelector('.process-button');
+            const processStatus = document.getElementById('processStatus');
+            const processProgress = document.getElementById('processProgress');
+            const progressFill = document.getElementById('processProgressFill');
+            const progressDetails = document.getElementById('progressDetails');
+            const fileList = document.getElementById('fileList');
+            
+            try {
+                processButton.disabled = true;
+                processButton.textContent = 'processing...';
+                processStatus.textContent = 'Starting...';
+                processProgress.style.display = 'block';
+                
+                // Use Server-Sent Events for real-time progress
+                const eventSource = new EventSource(`/api/files/process-stream?contributor=${encodeURIComponent(contributor)}`);
+                
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    
+                    switch(data.type) {
+                        case 'ping':
+                            processStatus.textContent = 'Connected...';
+                            break;
+                            
+                        case 'start':
+                            processStatus.textContent = `Processing ${data.total_files} files...`;
+                            fileList.innerHTML = '';
+                            break;
+                            
+                        case 'progress':
+                            const percent = (data.current_file / data.total_files) * 100;
+                            progressFill.style.width = `${percent}%`;
+                            progressDetails.textContent = `${data.current_file}/${data.total_files}: ${data.filename}`;
+                            
+                            // Add file to list
+                            const fileItem = document.createElement('div');
+                            fileItem.className = 'file-item';
+                            fileItem.innerHTML = `
+                                <span class="file-name">${data.filename}</span>
+                                <span class="file-status processing">${data.status}</span>
+                            `;
+                            fileList.appendChild(fileItem);
+                            break;
+                            
+                        case 'file_complete':
+                            // Update the file status in the list
+                            const items = fileList.querySelectorAll('.file-item');
+                            const lastItem = items[items.length - 1];
+                            if (lastItem) {
+                                const statusSpan = lastItem.querySelector('.file-status');
+                                statusSpan.textContent = data.status;
+                                statusSpan.className = `file-status ${data.status}`;
+                            }
+                            break;
+                            
+                        case 'complete':
+                            progressFill.style.width = '100%';
+                            processStatus.textContent = `✅ Processed ${data.processed_count} files`;
+                            eventSource.close();
+                            
+                            // Reload page after a delay to show updated library
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
+                            break;
+                            
+                        case 'error':
+                            processStatus.textContent = `❌ Error: ${data.error}`;
+                            eventSource.close();
+                            break;
+                    }
+                };
+                
+                eventSource.onerror = function(event) {
+                    processStatus.textContent = '❌ Connection error';
+                    eventSource.close();
+                    processButton.disabled = false;
+                    processButton.textContent = 'process now';
+                };
+                
+            } catch (error) {
+                processStatus.textContent = `❌ Error: ${error.message}`;
+                processButton.disabled = false;
+                processButton.textContent = 'process now';
+            }
+        }
+    </script>
+</body>
+</html> 

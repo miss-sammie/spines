@@ -78,9 +78,8 @@ logs/
 static/generated/
 
 # OCR processing outputs (these get regenerated)
-*.txt
-*.html
 ocr_output/
+temp/*.txt
 
 # Backup files
 *.bak
