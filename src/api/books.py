@@ -62,6 +62,43 @@ def get_book(book_id):
         logger.error(f"Error getting book {book_id}: {e}")
         return jsonify({'error': 'Failed to get book'}), 500
 
+@books_api.route('/books/<book_id>/files')
+def get_book_files(book_id):
+    """Get all readable files for a specific book"""
+    config = current_app.config['SPINES_CONFIG']
+    book_service = BookService(config)
+
+    book = book_service.get_book(book_id)
+    if not book:
+        return jsonify({'error': 'Book not found'}), 404
+
+    folder_name = book.get("folder_name", book_id)
+    book_dir = Path(config.BOOKS_PATH) / folder_name
+
+    readable_files = []
+    supported_exts = ['.pdf', '.epub', '.mobi', '.azw', '.azw3', '.djvu', '.djv', '.txt']
+
+    if book_dir.exists():
+        for p in book_dir.iterdir():
+            if p.is_file() and p.suffix.lower() in supported_exts:
+                readable_files.append({
+                    "name": p.name,
+                    "type": p.suffix.lower().strip('.')
+                })
+
+    # Also check for files directly in the library root (legacy)
+    for ext in supported_exts:
+        direct_file = Path(config.BOOKS_PATH) / f"{folder_name}{ext}"
+        if direct_file.exists():
+            # Avoid duplicates if already found in a folder
+            if not any(f['name'] == direct_file.name for f in readable_files):
+                 readable_files.append({
+                    "name": direct_file.name,
+                    "type": ext.strip('.')
+                })
+
+    return jsonify(readable_files)
+
 @books_api.route('/books/<book_id>', methods=['PUT'])
 def update_book(book_id):
     """Update book metadata"""
@@ -114,7 +151,7 @@ def delete_book(book_id):
 
 @books_api.route('/books/<book_id>/file')
 def serve_book_file(book_id):
-    """Serve book file for download/viewing"""
+    """Serve book file for download/viewing. Can specify a filename."""
     try:
         config = current_app.config['SPINES_CONFIG']
         book_service = BookService(config)
@@ -124,65 +161,112 @@ def serve_book_file(book_id):
         if not book:
             return "Book not found", 404
         
-        # Find the PDF file in the book's directory
         folder_name = book.get("folder_name", book_id)
         book_dir = Path(config.BOOKS_PATH) / folder_name
+        
+        # Check for specific filename request
+        requested_filename = request.args.get('filename')
+        book_file = None
 
-        # 1) Prefer explicit filename stored in metadata (pdf_filename or filename)
-        preferred_names = [
-            book.get("pdf_filename"),
-            book.get("filename"),
-            f"{folder_name}.pdf"  # canonical fallback
-        ]
-        for name in preferred_names:
-            if name:
-                candidate = book_dir / name
-                if candidate.exists():
-                    book_file = candidate
-                    break
-        else:
-            # 2) Otherwise pick first non-archived PDF in folder
-            pdf_candidates = [p for p in book_dir.glob("*.pdf") if not p.stem.endswith("_old")]
-            if pdf_candidates:
-                # Sort by modification time desc so newest first
-                pdf_candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-                book_file = pdf_candidates[0]
+        if requested_filename:
+            candidate_path = book_dir / requested_filename
+            if candidate_path.exists():
+                book_file = candidate_path
             else:
-                book_file = None
-
-        # If still not found, look directly in library root
-        if not book_file:
-            direct_pdf = Path(config.BOOKS_PATH) / f"{folder_name}.pdf"
-            if direct_pdf.exists():
-                book_file = direct_pdf
-                book_dir = Path(config.BOOKS_PATH)
-            else:
-                # Fallback search (other formats)
-                ebook_files = []
-                for ext in ['.pdf', '.epub', '.mobi', '.azw', '.azw3', '.djvu', '.djv']:
-                    potential = Path(config.BOOKS_PATH) / f"{folder_name}{ext}"
-                    if potential.exists():
-                        ebook_files.append(potential)
-                if ebook_files:
-                    ebook_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-                    book_file = ebook_files[0]
+                # Fallback to root for legacy files
+                legacy_path = Path(config.BOOKS_PATH) / requested_filename
+                if legacy_path.exists():
+                    book_file = legacy_path
                     book_dir = Path(config.BOOKS_PATH)
+        else:
+            # Existing logic to find the best file if no specific filename is given
+            # 1) Prefer explicit filename stored in metadata
+            preferred_names = [
+                book.get("pdf_filename"),
+                book.get("filename"),
+                f"{folder_name}.pdf"
+            ]
+            for name in preferred_names:
+                if name:
+                    candidate = book_dir / name
+                    if candidate.exists():
+                        book_file = candidate
+                        break
+            
+            # 2) If not found, pick first non-archived PDF in folder
+            if not book_file and book_dir.exists():
+                pdf_candidates = [p for p in book_dir.glob("*.pdf") if not p.stem.endswith("_old")]
+                if pdf_candidates:
+                    pdf_candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                    book_file = pdf_candidates[0]
+
+            # 3) If still not found, look for legacy files in root
+            if not book_file:
+                direct_pdf = Path(config.BOOKS_PATH) / f"{folder_name}.pdf"
+                if direct_pdf.exists():
+                    book_file = direct_pdf
+                    book_dir = Path(config.BOOKS_PATH)
+                else: # Final fallback for other ebook types
+                    ebook_files = []
+                    for ext in ['.pdf', '.epub', '.mobi', '.azw', '.azw3', '.djvu', '.djv']:
+                        potential = Path(config.BOOKS_PATH) / f"{folder_name}{ext}"
+                        if potential.exists():
+                            ebook_files.append(potential)
+                    if ebook_files:
+                        ebook_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                        book_file = ebook_files[0]
+                        book_dir = Path(config.BOOKS_PATH)
 
         if not book_file or not book_file.exists():
             return "No readable file found for this book", 404
 
         logger.info(f"Serving file: {book_file}")
         
-        # Serve the file
         return send_from_directory(
-            str(book_dir),  # Convert Path to string
+            str(book_dir),
             book_file.name,
-            as_attachment=False  # Display in browser instead of downloading
+            as_attachment=False
         )
         
     except Exception as e:
         logger.exception(f"Error serving book file {book_id}")
         return f"Error serving file: {str(e)}", 500
+
+@books_api.route('/books/<book_id>/file', methods=['PUT'])
+def save_book_file(book_id):
+    """Save a text file for a book"""
+    if current_app.access_control.is_public_request(request) and current_app.config['PUBLIC_READ_ONLY']:
+        return jsonify({'error': 'Read-only access'}), 403
+
+    config = current_app.config['SPINES_CONFIG']
+    book_service = BookService(config)
+
+    book = book_service.get_book(book_id)
+    if not book:
+        return jsonify({'error': 'Book not found'}), 404
+
+    filename = request.args.get('filename')
+    if not filename:
+        return jsonify({'error': 'Filename parameter is required'}), 400
+
+    if not filename.lower().endswith('.txt'):
+        return jsonify({'error': 'Only .txt files can be edited'}), 400
+
+    folder_name = book.get("folder_name", book_id)
+    book_dir = Path(config.BOOKS_PATH) / folder_name
+    file_path = book_dir / filename
+
+    if not file_path.parent.exists():
+        return jsonify({'error': 'Book directory does not exist'}), 404
+
+    try:
+        data = request.get_data(as_text=True)
+        file_path.write_text(data, encoding='utf-8')
+        logger.info(f"Updated text file: {file_path}")
+        return jsonify({'success': True, 'message': f'{filename} saved successfully.'})
+    except Exception as e:
+        logger.exception(f"Error saving file {filename} for book {book_id}: {e}")
+        return jsonify({'error': 'Failed to save file'}), 500
 
 @books_api.route('/books/<book_id>/replace-file', methods=['POST'])
 def replace_file(book_id):

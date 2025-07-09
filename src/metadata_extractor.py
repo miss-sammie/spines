@@ -25,6 +25,7 @@ import time
 from services.book_service import BookService
 from services.text_service import TextService
 from utils.logging import get_logger
+from werkzeug.utils import secure_filename
 
 # Add pytesseract import
 try:
@@ -2199,215 +2200,54 @@ class MetadataExtractor:
         print(f"🔄 Processing book from temp: {temp_file_path.name}")
         
         try:
-            # FIRST: Refresh library index to pick up any external changes (like deletions)
+            # FIRST: Refresh library index to pick up any external changes
             self.refresh_library_index()
-            
-            # SECOND: Check for duplicates by hash BEFORE doing any expensive processing
-            book_id = self.generate_book_id(str(temp_file_path))
-            
-            # DEBUG: Add detailed logging for hash checking
-            print(f"🔍 DUPLICATE CHECK DEBUG:")
-            print(f"   File: {temp_file_path.name}")
-            print(f"   Generated hash: {book_id}")
-            print(f"   Library has {len(self.library_index['books'])} total books")
-            print(f"   Checking if {book_id} exists in library...")
-            
-            # Check if already processed by this contributor (same hash + same contributor)
-            if book_id in self.library_index["books"]:
-                print(f"   ✅ HASH MATCH FOUND! Book {book_id} exists in library")
-                # Load the existing book's metadata to check contributor
-                existing_book_info = self.library_index["books"][book_id]
-                folder_name = existing_book_info.get("folder_name", book_id)
-                book_dir = self.library_path / folder_name
-                metadata_file = book_dir / "metadata.json"
-                
-                if metadata_file.exists():
-                    try:
-                        with open(metadata_file, 'r') as f:
-                            existing_metadata = json.load(f)
-                            existing_contributors = existing_metadata.get("contributor", [])
-                            
-                            if contributor in existing_contributors:
-                                print(f"📚 DUPLICATE: Book already processed by this contributor (by hash): {temp_file_path.name}")
-                                print(f"   ⚠️  This file should go to review queue with duplicate flag!")
-                                
-                                # Add to review queue with duplicate flag instead of auto-rejecting
-                                # This gives the user a chance to review and decide
-                                duplicate_metadata = {
-                                    "title": existing_metadata.get("title", "Unknown"),
-                                    "author": existing_metadata.get("author", "Unknown"),
-                                    "year": existing_metadata.get("year", "Unknown"),
-                                    "isbn": existing_metadata.get("isbn", ""),
-                                    "file_type": temp_file_path.suffix.lower()[1:],  # Remove the dot
-                                    "media_type": "book",
-                                    "duplicate_of": book_id,
-                                    "existing_contributors": existing_contributors
-                                }
-                                
-                                # Create a fake extraction result for the review queue
-                                duplicate_result = ExtractionResult(
-                                    method=ExtractionMethod.BASIC,
-                                    success=True,
-                                    metadata=duplicate_metadata,
-                                    confidence=1.0,  # High confidence since we know it's a duplicate
-                                    isbn_found=bool(existing_metadata.get("isbn")),
-                                    text_extracted=False
-                                )
-                                
-                                review_id = self._add_to_review_queue_from_temp(
-                                    temp_file_path, 
-                                    duplicate_metadata, 
-                                    duplicate_result, 
-                                    reason=f"duplicate_file_same_contributor_{contributor}"
-                                )
-                                
-                                if review_id:
-                                    return {"status": "review_queue", "review_id": review_id, "reason": "duplicate_detected"}
-                                else:
-                                    return {"status": "failed", "error": "duplicate_review_queue_failed"}
-                            else:
-                                print(f"🔍 Same file hash but different contributor ({contributor} vs {existing_contributors})")
-                                print(f"   📋 Will add to review queue for manual decision on multi-copy handling")
-                                
-                                # Add to review queue for multi-contributor decision
-                                multicopy_metadata = {
-                                    "title": existing_metadata.get("title", "Unknown"),
-                                    "author": existing_metadata.get("author", "Unknown"),
-                                    "year": existing_metadata.get("year", "Unknown"),
-                                    "isbn": existing_metadata.get("isbn", ""),
-                                    "file_type": temp_file_path.suffix.lower()[1:],
-                                    "media_type": "book",
-                                    "potential_multicopy_of": book_id,
-                                    "existing_contributors": existing_contributors,
-                                    "new_contributor": contributor
-                                }
-                                
-                                multicopy_result = ExtractionResult(
-                                    method=ExtractionMethod.BASIC,
-                                    success=True,
-                                    metadata=multicopy_metadata,
-                                    confidence=1.0,
-                                    isbn_found=bool(existing_metadata.get("isbn")),
-                                    text_extracted=False
-                                )
-                                
-                                review_id = self._add_to_review_queue_from_temp(
-                                    temp_file_path,
-                                    multicopy_metadata,
-                                    multicopy_result,
-                                    reason=f"same_file_different_contributor_{contributor}"
-                                )
-                                
-                                if review_id:
-                                    return {"status": "review_queue", "review_id": review_id, "reason": "multicopy_detected"}
-                                else:
-                                    return {"status": "failed", "error": "multicopy_review_queue_failed"}
-                    except Exception as e:
-                        print(f"⚠️ Error reading existing metadata: {e}")
-                        # If we can't read metadata, assume it's the same contributor and flag as duplicate
-                        print(f"📚 DUPLICATE: Book already processed (by hash, metadata read failed): {temp_file_path.name}")
-                        
-                        fallback_metadata = {
-                            "title": "Unknown (metadata read failed)",
-                            "author": "Unknown",
-                            "year": "Unknown",
-                            "isbn": "",
-                            "file_type": temp_file_path.suffix.lower()[1:],
-                            "media_type": "book",
-                            "duplicate_of": book_id,
-                            "existing_contributors": ["unknown"]
-                        }
-                        
-                        fallback_result = ExtractionResult(
-                            method=ExtractionMethod.BASIC,
-                            success=True,
-                            metadata=fallback_metadata,
-                            confidence=0.8,
-                            isbn_found=False,
-                            text_extracted=False
-                        )
-                        
-                        review_id = self._add_to_review_queue_from_temp(
-                            temp_file_path,
-                            fallback_metadata,
-                            fallback_result,
-                            reason=f"duplicate_file_metadata_error"
-                        )
-                        
-                        if review_id:
-                            return {"status": "review_queue", "review_id": review_id, "reason": "duplicate_with_error"}
-                        else:
-                            return {"status": "failed", "error": "duplicate_error_review_queue_failed"}
-                else:
-                    print(f"📚 DUPLICATE: Book already processed (by hash, no metadata file): {temp_file_path.name}")
-                    # No metadata file exists but book ID is in index - flag as duplicate
-                    orphan_metadata = {
-                        "title": existing_book_info.get("title", "Unknown"),
-                        "author": existing_book_info.get("author", "Unknown"),
-                        "year": existing_book_info.get("year", "Unknown"),
-                        "isbn": existing_book_info.get("isbn", ""),
-                        "file_type": temp_file_path.suffix.lower()[1:],
-                        "media_type": "book",
-                        "duplicate_of": book_id,
-                        "existing_contributors": ["unknown"]
-                    }
-                    
-                    orphan_result = ExtractionResult(
-                        method=ExtractionMethod.BASIC,
-                        success=True,
-                        metadata=orphan_metadata,
-                        confidence=0.6,
-                        isbn_found=bool(existing_book_info.get("isbn")),
-                        text_extracted=False
-                    )
-                    
-                    review_id = self._add_to_review_queue_from_temp(
-                        temp_file_path,
-                        orphan_metadata,
-                        orphan_result,
-                        reason=f"duplicate_file_orphaned_entry"
-                    )
-                    
-                    if review_id:
-                        return {"status": "review_queue", "review_id": review_id, "reason": "duplicate_orphaned"}
-                    else:
-                        return {"status": "failed", "error": "duplicate_orphaned_review_queue_failed"}
-            
-            # If we get here, it's not a duplicate by hash - proceed with normal metadata extraction
-            print(f"✅ No hash duplicate found - proceeding with metadata extraction")
-            
+
             if progress_callback: progress_callback("extracting_metadata")
             
-            # DEBUG: Show a few sample hashes from the library for comparison
-            if len(self.library_index['books']) > 0:
-                sample_hashes = list(self.library_index['books'].keys())[:3]
-                print(f"   📋 Sample library hashes for comparison: {sample_hashes}")
-            else:
-                print(f"   📭 Library index is empty!")
-            
-            # Extract metadata using escalation procedure
+            # SECOND: Extract metadata from the uploaded file first.
             extraction_result = self.extract_metadata_with_escalation(temp_file_path)
+
+            if not extraction_result or not extraction_result.success:
+                 # If extraction completely fails, send to review queue with minimal info
+                print(f"  ⚠️ Metadata extraction failed, sending to review queue.")
+                fallback_meta = self._get_fallback_metadata(temp_file_path)
+                fallback_result = ExtractionResult(
+                    method=ExtractionMethod.BASIC,
+                    success=False, metadata=fallback_meta, confidence=0.1, isbn_found=False,
+                    text_extracted=False, error="Initial extraction failed"
+                )
+                review_id = self._add_to_review_queue_from_temp(temp_file_path, fallback_meta, fallback_result, reason="extraction_failed")
+                if review_id:
+                    return {"status": "review_queue", "review_id": review_id}
+                else:
+                    return {"status": "failed", "error": "review_queue_failed"}
             
-            if not extraction_result:
-                print(f"❌ Failed to extract metadata from {temp_file_path.name}")
-                if progress_callback: progress_callback("failed")
-                return {"status": "failed", "error": "metadata_extraction_failed"}
-            
-            # Add contextual metadata
             metadata = self.add_contextual_metadata(extraction_result.metadata)
-            metadata["contributor"] = [contributor] if contributor != "unknown" else []
-            metadata["extraction_method"] = extraction_result.method.value
-            metadata["extraction_confidence"] = extraction_result.confidence
-            
-            # Decision: auto-process or review queue?
+
+            # THIRD: Check for duplicates/similar books in the library
+            similar_books = self.find_similar_books(metadata)
+
+            if similar_books:
+                best_match = similar_books[0]
+                # High confidence match means we should add file to existing book, not create new one.
+                if best_match['confidence'] > 0.9:
+                    print(f"✅ High confidence match found ({best_match['similarity_type']} @ {best_match['confidence']:.2f}). Adding file to existing book.")
+                    if progress_callback: progress_callback("adding_to_existing")
+                    
+                    book_id = self._add_file_to_existing_book(best_match['book_id'], temp_file_path)
+                    if book_id:
+                        return {"status": "added_to_existing", "book_id": book_id, "title": best_match['metadata'].get('title')}
+                    else:
+                         return {"status": "failed", "error": "failed_to_add_to_existing"}
+
+            # FOURTH: If no strong duplicate, decide whether to auto-process or send to review.
             if (extraction_result.confidence >= self.min_confidence_auto_process and 
                 (extraction_result.isbn_found or extraction_result.method == ExtractionMethod.CALIBRE)):
                 
-                # High confidence + ISBN or from Calibre = auto-process
-                print(f"✅ High confidence ({extraction_result.confidence:.2f}) - auto-processing")
+                print(f"✅ High confidence ({extraction_result.confidence:.2f}) - auto-processing new book")
                 if progress_callback: progress_callback("processing")
                 
-                # Move file from temp to books directory and process
                 book_id = self.process_book_with_multi_copy_detection(temp_file_path, metadata, contributor)
                 
                 if book_id:
@@ -2418,8 +2258,7 @@ class MetadataExtractor:
                     return {"status": "failed", "error": "processing_failed"}
             
             else:
-                # Add to review queue, file stays in temp
-                print(f"📋 Adding to review queue (confidence: {extraction_result.confidence:.2f})")
+                print(f"📋 Low confidence ({extraction_result.confidence:.2f}), adding to review queue.")
                 if progress_callback: progress_callback("review_queue")
                 
                 review_id = self._add_to_review_queue_from_temp(temp_file_path, metadata, extraction_result)
@@ -2431,7 +2270,7 @@ class MetadataExtractor:
                     return {"status": "failed", "error": "review_queue_failed"}
                     
         except Exception as e:
-            print(f"❌ Error processing {temp_file_path.name}: {e}")
+            logger.exception(f"❌ Error processing {temp_file_path.name}: {e}")
             if progress_callback: progress_callback("failed")
             return {"status": "failed", "error": str(e)}
     
@@ -2502,6 +2341,35 @@ class MetadataExtractor:
         
         print(f"🧹 Temp cleanup complete: {cleaned} files cleaned, {errors} errors")
         return {"cleaned": cleaned, "errors": errors}
+
+    def _add_file_to_existing_book(self, existing_book_id: str, temp_file_path: Path):
+        """Adds a new file format to an existing book."""
+        book_info = self.library_index["books"].get(existing_book_id)
+        if not book_info:
+            print(f"⚠️ Cannot add file: Existing book not found: {existing_book_id}")
+            return None
+
+        folder_name = book_info.get("folder_name", existing_book_id)
+        book_dir = self.library_path / folder_name
+        book_dir.mkdir(exist_ok=True)
+
+        # Use the original filename from the temp path to preserve it
+        new_filename = secure_filename(temp_file_path.name)
+        new_file_path = book_dir / new_filename
+
+        if new_file_path.exists():
+            print(f"⚠️ File '{new_filename}' already exists in '{folder_name}'. Skipping.")
+            return existing_book_id # Still a success, just no change
+
+        shutil.move(str(temp_file_path), str(new_file_path))
+        print(f"  ✨ Added new file format '{new_filename}' to existing book '{folder_name}'")
+        
+        # Touch the metadata file to indicate a change
+        metadata_file = book_dir / "metadata.json"
+        if metadata_file.exists():
+            metadata_file.touch()
+
+        return existing_book_id
 
 
 if __name__ == "__main__":
