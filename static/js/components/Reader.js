@@ -94,7 +94,14 @@ class Reader {
         if (this.activeViewer && this.activeViewer.destroy) {
             this.activeViewer.destroy();
         }
-
+        if (this._epubResizeHandler) {
+            window.removeEventListener('resize', this._epubResizeHandler);
+            this._epubResizeHandler = null;
+        }
+        if (this._epubOverlay && this._epubOverlay.parentNode) {
+            this._epubOverlay.parentNode.removeChild(this._epubOverlay);
+            this._epubOverlay = null;
+        }
         this.activeViewer = null;
     }
 
@@ -203,14 +210,28 @@ class Reader {
 
         try {
             const book = ePub(url);
+            console.log('EPUB book loaded:', book);
             
-            // Let ePub.js handle responsive layout automatically
             const rendition = book.renderTo("epub-viewer-container", {
                 width: "100%",
                 height: "100%"
             });
+            console.log('EPUB rendition created:', rendition);
 
-            // Apply font size changes
+            // Responsive spread – single page on portrait, spread on landscape
+            const updateSpread = () => {
+                const w = this.mainView.clientWidth;
+                const h = this.mainView.clientHeight;
+                console.log('Container dimensions:', w, h);
+                if (w === 0 || h === 0) return;
+                if (w > h) {
+                    rendition.spread("auto"); // allow two-page
+                } else {
+                    rendition.spread("none"); // force single page
+                }
+            };
+
+            // Font size slider
             const fontSlider = this.toolbar.querySelector('#font-size');
             fontSlider.addEventListener('input', (e) => {
                 const size = e.target.value + '%';
@@ -218,39 +239,89 @@ class Reader {
             });
 
             await rendition.display();
+            console.log('EPUB display complete');
             
-            // Auto-fit container height to first page
-            rendition.on('rendered', () => {
-                const iframe = this.mainView.querySelector('iframe');
-                if (iframe && iframe.contentWindow) {
+            // Check if content actually rendered
+            setTimeout(() => {
+                const iframe = this.mainView.querySelector('#epub-viewer-container iframe');
+                console.log('EPUB iframe found:', !!iframe);
+                if (iframe) {
+                    console.log('EPUB iframe src:', iframe.src);
+                    console.log('EPUB iframe content loaded:', iframe.contentDocument ? 'yes' : 'no');
+                    console.log('EPUB iframe dimensions:', iframe.offsetWidth, 'x', iframe.offsetHeight);
+                    console.log('EPUB iframe style:', iframe.style.cssText);
+                    
+                    // Try to inspect iframe content
                     try {
-                        const doc = iframe.contentWindow.document;
-                        const height = doc.documentElement.scrollHeight;
-                        const container = this.mainView.querySelector('#epub-viewer-container');
-                        if (container && height > 0) {
-                            container.style.height = `${height}px`;
-                        }
+                        const doc = iframe.contentDocument || iframe.contentWindow.document;
+                        console.log('EPUB iframe body height:', doc.body ? doc.body.scrollHeight : 'no body');
+                        console.log('EPUB iframe body content:', doc.body ? doc.body.innerHTML.substring(0, 100) : 'no body');
                     } catch (e) {
-                        // Cross-origin or other access issues, use default
-                        console.debug('Could not access iframe content for height calc');
+                        console.log('Cannot access iframe content:', e.message);
                     }
                 }
-            });
+            }, 200);
             
+            // Now set up spread and overlay AFTER display
+            
+            // Check layout and force reflow if needed
+            console.log('EPUB layout:', rendition._layout.name);
+            if (rendition._layout.name === 'pre-paginated') {
+                console.log('Pre-paginated layout detected - keeping as fixed pages');
+                // Just resize to fit container properly
+                rendition.resize('100%', '100%');
+            } else {
+                console.log('Reflowable EPUB - setting up responsive spread');
+                // Only do spread logic for reflowable books
+                updateSpread();
+            }
+            
+            window.addEventListener('resize', updateSpread);
+            this._epubResizeHandler = updateSpread;
+
+            // Tap / click navigation overlay - add AFTER epub is rendered
+            setTimeout(() => {
+                const container = this.mainView.querySelector('#epub-viewer-container');
+                if (container) {
+                    const overlay = document.createElement('div');
+                    overlay.className = 'epub-nav-overlay';
+                    container.appendChild(overlay);
+                    
+                    const handleNav = (clientX) => {
+                        const rect = overlay.getBoundingClientRect();
+                        const relX = clientX - rect.left;
+                        const ratio = relX / rect.width;
+                        console.log('Nav click at ratio:', ratio);
+                        if (ratio < 0.33) rendition.prev();
+                        else if (ratio > 0.66) rendition.next();
+                    };
+                    
+                    overlay.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleNav(e.clientX);
+                    });
+                    overlay.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        if (e.touches && e.touches.length) {
+                            handleNav(e.touches[0].clientX);
+                        }
+                    });
+                    overlay.style.touchAction = 'manipulation';
+                    this._epubOverlay = overlay;
+                    console.log('Navigation overlay added');
+                }
+            }, 100);
+
             this.activeViewer = rendition;
 
-            // Wire up navigation
+            // Wire up toolbar buttons
             this.toolbar.querySelector('#prev-page').addEventListener('click', () => {
+                console.log('Prev button clicked');
                 rendition.prev();
             });
             this.toolbar.querySelector('#next-page').addEventListener('click', () => {
+                console.log('Next button clicked');
                 rendition.next();
-            });
-
-            // Keyboard navigation
-            rendition.on('keyup', (e) => {
-                if (e.key === 'ArrowLeft') rendition.prev();
-                if (e.key === 'ArrowRight') rendition.next();
             });
 
         } catch (error) {

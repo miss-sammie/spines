@@ -150,13 +150,37 @@
     overflow: visible;
 } 
 
-/* EPUB viewer overrides */
-#epub-viewer-container {
-    height: 100%;
-    overflow: hidden; /* Let ePub.js handle all scrolling internally */
-}
-
 /* Hide textarea scrollbars – outer reader now handles scrolling */
 .txt-viewer {
     overflow: hidden;
+} 
+
+/* EPUB tap-navigation overlay */
+.epub-nav-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    background: transparent;
+    pointer-events: auto;
+}
+
+/* Ensure container has relative positioning for overlay */
+#epub-viewer-container {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Bigger toolbar buttons on small screens */
+@media (max-width: 768px) {
+    .reader-toolbar button {
+        font-size: 18px;
+        padding: 6px 12px;
+    }
+    .reader-toolbar label {
+        font-size: 14px;
+    }
 } 
