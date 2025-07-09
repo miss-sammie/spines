@@ -39,12 +39,47 @@
     window.open(`/api/books/${bookId}/file`, '_blank');
   }
 
+  async function replaceFile(bookId, title = '') {
+    // Prompt user to select a new PDF and upload it
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    input.onchange = async () => {
+      const file = input.files[0];
+      document.body.removeChild(input);
+      if (!file) return;
+
+      toast('📂 replacing file...', 'info');
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`/api/books/${bookId}/replace-file`, {
+          method: 'POST',
+          body: fd
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        toast('✅ file replaced', 'success');
+        // small delay then reload to fetch updated info
+        setTimeout(() => location.reload(), 1200);
+      } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+      }
+    };
+
+    input.click();
+  }
+
   // Expose globally so templates can call directly
   window.openFile = openFile;
   window.extractText = extractText;
   window.deleteBook = deleteBook;
+  window.replaceFile = replaceFile;
   // Also namespace for modules
-  window.BookActions = { openFile, extractText, deleteBook };
+  window.BookActions = { openFile, extractText, deleteBook, replaceFile };
 
   // Delegated click handler for buttons that declare a book action via data attributes
   document.addEventListener('click', (e) => {
@@ -62,6 +97,9 @@
         break;
       case 'delete':
         deleteBook(bookId, btn.dataset.bookTitle || '');
+        break;
+      case 'replace-file':
+        replaceFile(bookId, btn.dataset.bookTitle || '');
         break;
       default:
         console.warn(`BookActions: unknown action "${action}"`);

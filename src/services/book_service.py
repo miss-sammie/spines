@@ -118,43 +118,50 @@ class BookService:
             return summary
     
     def update_book(self, book_id, metadata):
-        """Update book metadata in both library.json and per-book metadata.json"""
+        """Update book metadata in both library.json and per-book metadata.json.
+
+        If a change to author, title, year or isbn would alter the canonical folder
+        name, this method will also rename the folder and contained files so the
+        on-disk layout stays in sync with the metadata.
+        """
         library = self.load_library()
-        
         if book_id not in library.get('books', {}):
             raise ValueError(f"Book {book_id} not found")
-        
-        # Update library.json summary
-        library['books'][book_id].update(metadata)
-        
-        # Also update per-book metadata.json if it exists
-        folder_name = library['books'][book_id].get('folder_name', book_id)
+
+        # Merge new metadata into library record first so folder computation uses latest values
+        library_record = library['books'][book_id]
+        library_record.update(metadata)
+
+        old_folder = library_record.get('folder_name', book_id)
+        new_folder = self._compute_folder_name(library_record)
+
+        # Only perform expensive rename if the canonical name has changed
+        if new_folder != old_folder:
+            final_folder = self._rename_book_assets(old_folder, new_folder)
+            # Update paths inside library record after physical move
+            library_record['folder_name'] = final_folder
+            library_record['path'] = f"books/{final_folder}"
+
+        # Also update per-book metadata.json if it exists (post-rename path accounted for)
+        folder_name = library_record.get('folder_name', book_id)
         book_dir = Path(self.config.BOOKS_PATH) / folder_name
         metadata_file = book_dir / 'metadata.json'
-        
         if metadata_file.exists():
             try:
-                # Load current per-book metadata
-                with open(metadata_file, 'r', encoding='utf-8') as f:
-                    book_metadata = json.load(f)
-                
-                # Update with new metadata
-                book_metadata.update(metadata)
-                
-                # Save back to per-book file
-                with open(metadata_file, 'w', encoding='utf-8') as f:
-                    json.dump(book_metadata, f, indent=2, default=str, ensure_ascii=False)
-                
-                logger.info(f"Updated per-book metadata for {book_id}")
-                
+                with open(metadata_file, 'r', encoding='utf-8') as fh:
+                    per_book_meta = json.load(fh)
+                per_book_meta.update(metadata)
+                # Ensure folder_name stays consistent
+                per_book_meta['folder_name'] = folder_name
+                with open(metadata_file, 'w', encoding='utf-8') as fh:
+                    json.dump(per_book_meta, fh, indent=2, ensure_ascii=False)
             except Exception as e:
                 logger.warning(f"Failed to update per-book metadata for {book_id}: {e}")
-        
-        # Save library.json
+
+        # Finally, persist library.json
         self.save_library(library)
-        
         logger.info(f"Updated book {book_id}")
-        return library['books'][book_id]
+        return library_record
     
     def delete_book(self, book_id):
         """Delete a book"""
@@ -308,3 +315,87 @@ class BookService:
             logger.error(f"  💥 ISBN lookup failed completely: {e}")
         
         return {} 
+
+    def _clean_for_filename(self, s: str, max_length: int = 50) -> str:
+        """Utility to sanitise a string so it can be safely used in a filename."""
+        import re
+        if not s:
+            return "Unknown"
+        # Remove any character that is not alphanumeric, whitespace, hyphen or underscore
+        cleaned = re.sub(r'[^\w\s\-]', '', s)
+        # Collapse whitespace
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        # Replace spaces with underscores
+        cleaned = cleaned.replace(' ', '_')
+        return cleaned[:max_length]
+
+    def _compute_folder_name(self, metadata: dict) -> str:
+        """Re-compute the canonical folder / base filename for a book based on current metadata.
+
+        It mirrors the logic in MetadataExtractor.normalize_filename so both CLI and
+        web edits stay consistent without importing that heavy module here.
+        """
+        author   = self._clean_for_filename(str(metadata.get('author', 'Unknown_Author')).split(',')[0], 30)
+        title    = self._clean_for_filename(str(metadata.get('title',  'Unknown_Title')), 40)
+        year     = str(metadata.get('year', 'Unknown_Year'))
+        media_id = metadata.get('isbn') or 'no_id'
+        return f"{author}_{title}_{year}_{media_id}"
+
+    def _rename_book_assets(self, old_folder: str, new_folder: str) -> str:
+        """Physically rename the on-disk folder and contained files.
+
+        If the target folder already exists we will append a numerical suffix
+        to avoid collisions (foldername_1, _2, ...).
+        """
+        from pathlib import Path
+        import shutil, os
+
+        books_root = Path(self.config.BOOKS_PATH)
+        old_dir    = books_root / old_folder
+        if not old_dir.exists():
+            # Might be a legacy layout with files at root – bail out for safety.
+            logger.warning(f"Old folder '{old_dir}' not found. Skipping physical rename.")
+            return
+
+        # Ensure new folder name is unique
+        new_dir = books_root / new_folder
+        if new_dir.exists():
+            suffix = 1
+            while (books_root / f"{new_folder}_{suffix}").exists():
+                suffix += 1
+            new_folder = f"{new_folder}_{suffix}"
+            new_dir = books_root / new_folder
+
+        logger.info(f"Renaming book folder '{old_dir.name}' -> '{new_dir.name}'")
+        old_dir.rename(new_dir)
+
+        # Rename files inside the folder that start with the old prefix
+        for f in new_dir.iterdir():
+            if f.is_file() and f.name.startswith(old_folder):
+                new_name = f.name.replace(old_folder, new_folder, 1)
+                f.rename(new_dir / new_name)
+
+        # Also attempt to rename any orphaned root-level files (rare)
+        for ext in ['.pdf', '.epub', '.mobi', '.azw', '.azw3', '.djvu', '.djv', '.txt']:
+            legacy_file = books_root / f"{old_folder}{ext}"
+            if legacy_file.exists():
+                legacy_file.rename(books_root / f"{new_folder}{ext}")
+
+        # Update metadata.json inside the folder, if present
+        meta_path = new_dir / 'metadata.json'
+        if meta_path.exists():
+            try:
+                with open(meta_path, 'r', encoding='utf-8') as fh:
+                    meta = json.load(fh)
+                meta['folder_name'] = new_folder
+                # Update common filename fields if present
+                for key in ['filename', 'pdf_filename', 'text_filename']:
+                    if key in meta and meta[key]:
+                        base, ext = os.path.splitext(meta[key])
+                        meta[key] = f"{new_folder}{ext}"
+                with open(meta_path, 'w', encoding='utf-8') as fh:
+                    json.dump(meta, fh, indent=2, ensure_ascii=False)
+            except Exception as e:
+                logger.warning(f"Failed to update inner metadata.json after rename: {e}")
+
+        return new_folder  # Return the possibly suffixed final folder name 

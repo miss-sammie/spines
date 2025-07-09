@@ -10,6 +10,7 @@ class BookCard {
                 { key: 'open-file', label: '📖 open file' },
                 { key: 'extract-text',
                   label: (b)=> b.text_extracted ? '🔄 re-extract text' : '🔍 extract text' },
+                { key: 'replace-file', label: '📂 replace file' },
                 { key: 'delete', label: '🗑️ delete book', classes:'delete' }
             ],
             ...options
@@ -77,7 +78,7 @@ class BookCard {
     /* renderFull – rich detail variant */
     renderFull() {
         const b = this.book;
-        const formatArr = (arr)=> Array.isArray(arr) ? arr.join(', ') : (arr||'');
+        const formatArr = (arr)=> Array.isArray(arr)? arr.join(', '): (arr||'');
         const metaRow = (label, field, value, type='text', editable=true)=>{
             if(value===undefined||value===null||value==='') value = editable? 'click to add' : 'unknown';
             const valHtml = editable

@@ -380,6 +380,9 @@ class BookGrid {
                 case 'delete':
                     window.BookActions?.deleteBook(bookId, actionEl.dataset.bookTitle || '');
                     break;
+                case 'replace-file':
+                    window.BookActions?.replaceFile(bookId, actionEl.dataset.bookTitle || '');
+                    break;
                 default:
                     console.warn(`BookGrid: unknown action "${action}"`);
             }

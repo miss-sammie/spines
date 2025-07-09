@@ -520,5 +520,79 @@ def list_by_type(ctx, media_type):
         click.echo(f"\n📊 Total: {count} items")
 
 
+# ---------------------------------------------------------------------------
+# Collections commands
+# ---------------------------------------------------------------------------
+
+@cli.group()
+@click.pass_context
+
+def collections(ctx):
+    """Manage book collections"""
+    ctx.ensure_object(dict)
+
+
+@collections.command(name="list")
+@click.pass_context
+def list_collections_cmd(ctx):
+    """List existing collections"""
+    from src.services.collection_service import CollectionManager
+    mgr = CollectionManager(
+        library_path=ctx.obj["library_path"],
+        data_path=ctx.obj["data_path"],
+    )
+    cols = mgr.list_collections()
+    if not cols:
+        click.echo("(no collections)")
+        return
+    for col in cols:
+        click.echo(f"{col['id'][:8]}  {col['name']}  ({col['mode']}) – {col.get('description','')}")
+
+
+@collections.command(name="create")
+@click.argument('name')
+@click.option('--description', '-d', default='', help='Description for the collection')
+@click.option('--mode', type=click.Choice(['static', 'dynamic']), default='dynamic')
+@click.option('--filter', 'filters', multiple=True, help='Filter in key=value format, repeatable')
+@click.pass_context
+def create_collection_cmd(ctx, name, description, mode, filters):
+    """Create a new collection"""
+    from src.services.collection_service import CollectionManager
+    mgr = CollectionManager(
+        library_path=ctx.obj["library_path"],
+        data_path=ctx.obj["data_path"],
+    )
+    filters_dict = {}
+    for f in filters:
+        if '=' not in f:
+            click.echo(f"Ignoring invalid filter format: {f}")
+            continue
+        key, val = f.split('=', 1)
+        # split comma lists
+        if ',' in val:
+            val = [v.strip() for v in val.split(',') if v.strip()]
+        filters_dict[key.strip()] = val
+    col = mgr.create_collection(name=name, description=description, mode=mode, filters=filters_dict)
+    click.echo(f"Created collection {col['id'][:8]} – {col['name']}")
+
+
+@collections.command(name="add")
+@click.argument('collection_id')
+@click.argument('book_id')
+@click.pass_context
+def add_book_collection_cmd(ctx, collection_id, book_id):
+    """Add a book to a *static* collection"""
+    from src.services.collection_service import CollectionManager
+    mgr = CollectionManager(
+        library_path=ctx.obj["library_path"],
+        data_path=ctx.obj["data_path"],
+    )
+    try:
+        mgr.add_book(collection_id, book_id)
+        click.echo("Added book to collection")
+    except ValueError as exc:
+        click.echo(f"Error: {exc}")
+
+
 if __name__ == '__main__':
     cli() 

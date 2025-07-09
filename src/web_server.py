@@ -12,6 +12,8 @@ from services.review_service import ReviewService
 from services.ocr_service import OCRService
 from routes.main import main_bp
 from routes.admin import admin_bp
+from routes.collections import collections_bp
+
 from api.books import books_api
 from api.library import library_api
 from api.files import files_api
@@ -57,6 +59,8 @@ def create_app(config):
     # Register blueprints
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp)
+    # Collections blueprint (API)
+    app.register_blueprint(collections_bp, url_prefix="/api")
     app.register_blueprint(books_api, url_prefix='/api')
     app.register_blueprint(library_api, url_prefix='/api')
     app.register_blueprint(files_api, url_prefix='/api')
