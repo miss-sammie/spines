@@ -60,4 +60,24 @@ def book_detail(book_id):
     if current_app.access_control.is_public_request(request):
         book = current_app.access_control.filter_for_public(book)
     
-    return render_template('book-detail.html', book=book) 
+    return render_template('book-detail.html', book=book)
+
+@main_bp.route('/reader')
+def reader():
+    """Dedicated reader page"""
+    book_id = request.args.get('book')
+    title = request.args.get('title')
+    author = request.args.get('author')
+    if not book_id:
+        return "No book ID provided", 400
+    config = current_app.config['SPINES_CONFIG']
+    book_service = BookService(config)
+    book = book_service.get_book(book_id)
+    if not book:
+        return "Book not found", 404
+    # Use book's title/author if not provided
+    if not title:
+        title = book.get('title', 'Unknown Book')
+    if not author:
+        author = book.get('author', '')
+    return render_template('reader.html', book_id=book_id, title=title, author=author) 

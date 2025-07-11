@@ -36,7 +36,23 @@
   }
 
   function openFile(bookId) {
-    window.open(`/api/books/${bookId}/file`, '_blank');
+    // Get the book title and author for the reader page
+    const bookCard = document.querySelector(`[data-book-id="${bookId}"]`);
+    const title = bookCard ? bookCard.querySelector('.book-title')?.textContent || 'Unknown Book' : 'Unknown Book';
+    const author = bookCard ? bookCard.querySelector('.book-author')?.textContent || '' : '';
+    // Open in popup on desktop, new tab on mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const url = `/reader?book=${bookId}&title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`;
+    if (isMobile) {
+      window.open(url, '_blank');
+    } else {
+      const popup = window.open(url, 'reader', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+      if (popup) {
+        popup.focus();
+      } else {
+        window.open(url, '_blank');
+      }
+    }
   }
 
   async function replaceFile(bookId, title = '') {

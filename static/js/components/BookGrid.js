@@ -133,7 +133,9 @@ class BookGrid {
                     book.title || '',
                     book.author || '',
                     book.year ? book.year.toString() : '',
-                    book.isbn || ''
+                    book.contributor ? (Array.isArray(book.contributor) ? book.contributor.join(' ') : book.contributor) : '',
+                    book.read_by ? (Array.isArray(book.read_by) ? book.read_by.join(' ') : book.read_by) : '',
+                    book.tags ? (Array.isArray(book.tags) ? book.tags.join(' ') : book.tags) : ''
                 ].join(' ').toLowerCase();
                 
                 return searchTerms.includes(this.currentSearch);

@@ -64,11 +64,10 @@ class BookCard {
                     ${this.createEditableField('title', b.title || 'Unknown Title', false, 'book-title')}
                     ${this.createEditableField('author', b.author || 'Unknown Author', false, 'book-author')}
                     ${this.createEditableField('year', b.year || 'click to add', false, 'book-year')}
-                    ${b.isbn ? this.createEditableField('isbn', b.isbn, false, 'book-isbn') : ''}
                 </div>
                 <div class="book-meta">
                     ${b.contributor ? `<div class="contributor">contributed by: ${Array.isArray(b.contributor) ? b.contributor.join(', ') : b.contributor}</div>` : ''}
-                    ${b.readers && b.readers.length > 0 ? `<div class="read-status">read by: ${b.readers.join(', ')}</div>` : ''}
+                    ${b.read_by && b.read_by.length > 0 ? `<div class="read-status">read by: ${b.read_by.join(', ')}</div>` : ''}
                     ${b.tags && b.tags.length > 0 ? `<div class="tags">tags: ${b.tags.join(', ')}</div>` : ''}
                     ${b.related_copies && b.related_copies.length > 0 ? `<div class="related-copies">${b.related_copies.length} related cop${b.related_copies.length === 1 ? 'y' : 'ies'}</div>` : ''}
                 </div>

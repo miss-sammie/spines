@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reader - spines 2.0</title>
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/reader.css">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+            font-family: 'Monaco', 'Consolas', monospace;
+        }
+        .reader-header {
+            background: white;
+            border-bottom: 2px solid black;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .reader-title {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .reader-close {
+            background: none;
+            border: 1px solid black;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+        }
+        .reader-close:hover {
+            background: black;
+            color: white;
+        }
+        .reader-author {
+            margin-left: 10px;
+            font-size: 13px;
+            color: #666;
+        }
+        .reader-inline-container {
+            width: 100vw;
+            /* height: calc(100vh - 44px); */
+            border: 2px solid black;
+            background: white;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        @media (max-width: 768px) {
+            .reader-header {
+                padding: 8px 10px;
+            }
+            .reader-title {
+                font-size: 12px;
+            }
+            .reader-close {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <script src="/static/js/components/Reader.js"></script>
+</head>
+<body style="height:100%;margin:0;padding:0;">
+    <div class="reader-header">
+        <div>
+            <span class="reader-title" id="reader-title">Loading...</span>
+            <span class="reader-author" id="reader-author"></span>
+        </div>
+        <button class="reader-close" onclick="closeReader()">close</button>
+    </div>
+    <div id="reader-container" class="reader-inline-container"></div>
+    <script>
+        let reader = null;
+        let bookId = null;
+        let bookTitle = '';
+        let bookAuthor = '';
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                bookId: params.get('book'),
+                title: params.get('title') || 'Unknown Book',
+                author: params.get('author') || ''
+            };
+        }
+        function initReader() {
+            const { bookId: id, title, author } = getUrlParams();
+            if (!id) {
+                document.getElementById('reader-container').innerHTML = 
+                    '<div class="reader-error">No book ID provided</div>';
+                return;
+            }
+            bookId = id;
+            bookTitle = decodeURIComponent(title);
+            bookAuthor = decodeURIComponent(author);
+            document.getElementById('reader-title').textContent = bookTitle;
+            document.getElementById('reader-author').textContent = bookAuthor ? 'by ' + bookAuthor : '';
+            reader = new Reader('reader-container', { isInline: true });
+            reader.show(bookId);
+        }
+        function closeReader() {
+            if (window.opener) {
+                window.close();
+            } else {
+                window.location.href = '/';
+            }
+        }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeReader();
+            }
+        });
+        document.addEventListener('DOMContentLoaded', initReader);
+        window.addEventListener('resize', () => {
+            if (reader && reader.activeViewer && reader.activeViewer.resize) {
+                reader.activeViewer.resize();
+            }
+        });
+    </script>
+</body>
+</html> 

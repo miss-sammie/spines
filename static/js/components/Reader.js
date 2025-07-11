@@ -106,30 +106,28 @@ class Reader {
     }
 
     renderFileSelection() {
-        if (this.files.length === 0) {
+        // Filter out files with '_old' in the name
+        const filteredFiles = this.files.filter(file => !file.name.includes('_old'));
+        if (filteredFiles.length === 0) {
             this.mainView.innerHTML = '<div class="reader-error">No readable files found for this book.</div>';
             return;
         }
-
-        if (this.files.length === 1) {
-            this.loadFile(this.files[0].name, this.files[0].type);
+        if (filteredFiles.length === 1) {
+            this.loadFile(filteredFiles[0].name, filteredFiles[0].type);
             return;
         }
-
-        const filesHTML = this.files.map(file => `
+        const typeLabels = { pdf: 'PDF', epub: 'EPUB', txt: 'Text' };
+        const filesHTML = filteredFiles.map(file => `
             <li class="file-item" data-filename="${file.name}" data-filetype="${file.type}">
-                <span class="file-icon">${this.getIconForType(file.type)}</span>
-                <span class="file-name">${file.name}</span>
+                ${typeLabels[file.type] || file.type.toUpperCase()}
             </li>
         `).join('');
-
         this.mainView.innerHTML = `
             <div class="file-selector">
                 <h3>Select a file to read:</h3>
                 <ul>${filesHTML}</ul>
             </div>
         `;
-
         this.mainView.querySelectorAll('.file-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 const target = e.currentTarget;
@@ -171,28 +169,66 @@ class Reader {
         const url = `/api/books/${this.bookId}/file?filename=${encodeURIComponent(filename)}`;
         this.mainView.innerHTML = `<div id="pdf-viewer-container"></div>`;
         const container = this.mainView.querySelector('#pdf-viewer-container');
+        
+        // No toolbar needed for PDF
+        this.toolbar.innerHTML = '';
 
         try {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            
             const loadingTask = pdfjsLib.getDocument(url);
             const pdf = await loadingTask.promise;
 
+            // Get device pixel ratio for crisp rendering
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            // Use a high base scale for sharp rendering
+            const baseScale = Math.max(2.0, devicePixelRatio);
+            
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                 const page = await pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: baseScale });
+                
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
                 
-                const viewport = page.getViewport({ scale: 1.5 });
+                // Set canvas to high resolution
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
+                
+                // Calculate responsive scale to fit container width
+                const displayViewport = page.getViewport({ scale: 1.0 });
+                
+                // Get the actual available width in the main view (accounting for padding)
+                const mainView = this.mainView;
+                const availableWidth = mainView.clientWidth - 40; // subtract padding
+                
+                // Debug: log the actual measurements
+                console.log('PDF scaling debug:', {
+                    mainViewWidth: mainView.clientWidth,
+                    availableWidth: availableWidth,
+                    pdfNativeWidth: displayViewport.width,
+                    calculatedScale: availableWidth / displayViewport.width,
+                    finalScale: Math.min(1.0, availableWidth / displayViewport.width)
+                });
+                
+                // Calculate scale to fit the available width (allow scaling up)
+                const scale = availableWidth / displayViewport.width;
+                const scaledViewport = page.getViewport({ scale });
+                
+                canvas.style.width = scaledViewport.width + 'px';
+                canvas.style.height = scaledViewport.height + 'px';
                 canvas.style.maxWidth = '100%';
-                canvas.style.height = 'auto';
                 canvas.className = 'pdf-page';
-                container.appendChild(canvas);
-
-                const renderContext = { canvasContext: context, viewport: viewport };
+                
+                const renderContext = { 
+                    canvasContext: context, 
+                    viewport: viewport 
+                };
+                
                 await page.render(renderContext).promise;
+                container.appendChild(canvas);
             }
+            
         } catch (error) {
             console.error('PDF loading error:', error);
             this.mainView.innerHTML = `<div class="reader-error">Failed to load PDF: ${error.message}</div>`;
@@ -214,22 +250,10 @@ class Reader {
             
             const rendition = book.renderTo("epub-viewer-container", {
                 width: "100%",
-                height: "100%"
+                height: "100%",
+                flow: "paginated"
             });
             console.log('EPUB rendition created:', rendition);
-
-            // Responsive spread – single page on portrait, spread on landscape
-            const updateSpread = () => {
-                const w = this.mainView.clientWidth;
-                const h = this.mainView.clientHeight;
-                console.log('Container dimensions:', w, h);
-                if (w === 0 || h === 0) return;
-                if (w > h) {
-                    rendition.spread("auto"); // allow two-page
-                } else {
-                    rendition.spread("none"); // force single page
-                }
-            };
 
             // Font size slider
             const fontSlider = this.toolbar.querySelector('#font-size');
@@ -241,45 +265,34 @@ class Reader {
             await rendition.display();
             console.log('EPUB display complete');
             
-            // Check if content actually rendered
-            setTimeout(() => {
-                const iframe = this.mainView.querySelector('#epub-viewer-container iframe');
-                console.log('EPUB iframe found:', !!iframe);
-                if (iframe) {
-                    console.log('EPUB iframe src:', iframe.src);
-                    console.log('EPUB iframe content loaded:', iframe.contentDocument ? 'yes' : 'no');
-                    console.log('EPUB iframe dimensions:', iframe.offsetWidth, 'x', iframe.offsetHeight);
-                    console.log('EPUB iframe style:', iframe.style.cssText);
-                    
-                    // Try to inspect iframe content
-                    try {
-                        const doc = iframe.contentDocument || iframe.contentWindow.document;
-                        console.log('EPUB iframe body height:', doc.body ? doc.body.scrollHeight : 'no body');
-                        console.log('EPUB iframe body content:', doc.body ? doc.body.innerHTML.substring(0, 100) : 'no body');
-                    } catch (e) {
-                        console.log('Cannot access iframe content:', e.message);
-                    }
+            // Set up responsive behavior
+            const updateLayout = () => {
+                const container = this.mainView.querySelector('#epub-viewer-container');
+                if (!container) return;
+                
+                const w = container.clientWidth;
+                const h = container.clientHeight;
+                
+                if (w > h) {
+                    // Landscape: allow spread
+                    rendition.spread("auto");
+                } else {
+                    // Portrait: single page
+                    rendition.spread("none");
                 }
-            }, 200);
-            
-            // Now set up spread and overlay AFTER display
-            
-            // Check layout and force reflow if needed
-            console.log('EPUB layout:', rendition._layout.name);
-            if (rendition._layout.name === 'pre-paginated') {
-                console.log('Pre-paginated layout detected - keeping as fixed pages');
-                // Just resize to fit container properly
+                
+                // Ensure proper sizing
                 rendition.resize('100%', '100%');
-            } else {
-                console.log('Reflowable EPUB - setting up responsive spread');
-                // Only do spread logic for reflowable books
-                updateSpread();
-            }
+            };
             
-            window.addEventListener('resize', updateSpread);
-            this._epubResizeHandler = updateSpread;
+            // Initial layout
+            setTimeout(updateLayout, 100);
+            
+            // Handle window resize
+            window.addEventListener('resize', updateLayout);
+            this._epubResizeHandler = updateLayout;
 
-            // Tap / click navigation overlay - add AFTER epub is rendered
+            // Navigation overlay
             setTimeout(() => {
                 const container = this.mainView.querySelector('#epub-viewer-container');
                 if (container) {
@@ -310,7 +323,7 @@ class Reader {
                     this._epubOverlay = overlay;
                     console.log('Navigation overlay added');
                 }
-            }, 100);
+            }, 200);
 
             this.activeViewer = rendition;
 

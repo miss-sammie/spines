@@ -64,34 +64,38 @@
 }
 
 /* File Selection */
+.file-selector {
+    padding: 40px 20px;
+    text-align: center;
+}
+
 .file-selector h3 {
-    margin-bottom: 20px;
+    margin-bottom: 30px;
     font-size: 16px;
 }
+
 .file-selector ul {
     list-style: none;
     padding: 0;
-    max-width: 400px;
     margin: 0 auto;
+    max-width: 300px;
 }
+
 .file-selector .file-item {
-    display: flex;
-    align-items: center;
-    padding: 10px;
+    display: block;
+    padding: 15px;
     border: 1px solid black;
     margin-bottom: 10px;
     cursor: pointer;
+    background: white;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
     transition: background-color 0.2s;
 }
+
 .file-selector .file-item:hover {
     background-color: #f0f0f0;
-}
-.file-selector .file-icon {
-    font-size: 24px;
-    margin-right: 15px;
-}
-.file-selector .file-name {
-    font-size: 14px;
 }
 
 /* TXT Viewer */
@@ -122,11 +126,14 @@
 .reader-inline-container {
     border: 2px solid black;
     background: white;
-    padding: 20px;
+    /* width: 100vw; */
+    height: auto;
+    box-sizing: border-box;
+    margin-left: 20px;
+    margin-right: 20px;
     margin-top: 20px;
-    min-height: 500px;
-    display: flex;
-    flex-direction: column;
+    margin-bottom: 20px;
+    padding: 0;
 }
 
 .reader-toolbar {
@@ -140,11 +147,25 @@
 #pdf-viewer-container .pdf-page {
     border: 1px solid #ccc;
     margin-bottom: 10px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 #epub-viewer-container {
-    height: 600px; /* Or adjust as needed */
-} 
+    height: 100% !important;
+    width: 100% !important; 
+    position: relative;
+    overflow: hidden;
+}
+
+#epub-viewer-container iframe {
+    /* width: 100% !important;
+    height: 100% !important; */
+    border: none;
+    display: block;
+}
 
 .reader-main-view.txt-active {
     overflow: visible;

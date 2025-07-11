@@ -62,9 +62,34 @@ class BookService:
             raise
     
     def get_books(self, page=1, limit=None, search=None, filters=None):
-        """Get books with optional pagination and filtering"""
+        """Get books with optional pagination and filtering, loading full metadata from individual files"""
         library = self.load_library()
-        books = list(library.get('books', {}).values())
+        book_summaries = library.get('books', {})
+        books = []
+        
+        # Load full metadata for each book
+        for book_id, summary in book_summaries.items():
+            # Try to load per-book metadata.json first
+            folder_name = summary.get('folder_name', book_id)
+            book_dir = Path(self.config.BOOKS_PATH) / folder_name
+            metadata_file = book_dir / 'metadata.json'
+            
+            if metadata_file.exists():
+                try:
+                    with open(metadata_file, 'r', encoding='utf-8') as f:
+                        book_metadata = json.load(f)
+                    # Ensure ID is set
+                    book_metadata['id'] = book_id
+                    books.append(book_metadata)
+                except Exception as e:
+                    logger.warning(f"Failed to load per-book metadata for {book_id}: {e}")
+                    # Fallback to summary
+                    summary['id'] = book_id
+                    books.append(summary)
+            else:
+                # Use summary if no metadata.json exists
+                summary['id'] = book_id
+                books.append(summary)
         
         # Apply search if provided
         if search:
