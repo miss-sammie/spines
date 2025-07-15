@@ -1,11 +1,12 @@
 version: '3.8'
 
 services:
-  spines-2:
+  # Tailscale/Private Access - Full permissions
+  spines-tailscale:
     build: .
-    container_name: spines-2-server
+    container_name: spines-tailscale-server
     ports:
-      - "8890:8888"  # Main application (v2.0 on port 8890)
+      - "8890:8888"  # Tailscale access (full permissions)
     volumes:
       # Books library
       - ./books:/app/books:rw
@@ -19,8 +20,34 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
       - SPINES_LOG_LEVEL=INFO
-      - SPINES_ACCESS_MODE=local
+      - SPINES_ACCESS_MODE=local  # Local mode = full access
       - SPINES_PUBLIC_READ_ONLY=false
+      - SPINES_ADMIN_USERS=hal,whisper
+    restart: unless-stopped
+    networks:
+      - spines-network
+
+  # Public Access - Read-only
+  spines-public:
+    build: .
+    container_name: spines-public-server
+    ports:
+      - "8889:8888"  # Public access (read-only)
+    volumes:
+      # Books library (read-only for safety)
+      - ./books:/app/books:ro
+      # Data persistence (still need write for logs/temp)
+      - ./data:/app/data:rw
+      - ./logs:/app/logs:rw
+      # For development: mount source code for hot reload
+      - ./src:/app/src:rw
+      - ./static:/app/static:rw
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - SPINES_LOG_LEVEL=INFO
+      - SPINES_ACCESS_MODE=public  # Public mode = read-only
+      - SPINES_PUBLIC_READ_ONLY=true
       - SPINES_ADMIN_USERS=hal,whisper
     restart: unless-stopped
     networks:
