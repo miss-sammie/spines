@@ -51,7 +51,7 @@ def create_app(config):
     app.database_service = DatabaseService(config)
     
     # Pass services to MetadataExtractor
-    from src.metadata_extractor import MetadataExtractor
+    from metadata_extractor import MetadataExtractor
     app.extractor = MetadataExtractor(config, book_service=app.book_service, text_service=app.text_service)
     
     # Setup access control

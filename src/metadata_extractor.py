@@ -160,6 +160,7 @@ class MetadataExtractor:
         self.library_index["metadata"]["last_updated"] = datetime.now().isoformat()
         self.library_index["metadata"]["total_books"] = len(self.library_index["books"])
         
+        # Always save to JSON
         with open(self.library_json_path, 'w', encoding='utf-8') as f:
             json.dump(self.library_index, f, indent=2, ensure_ascii=False)
     
@@ -1159,6 +1160,50 @@ class MetadataExtractor:
         
         # CRITICAL: Save the library index to disk!
         self.save_library_index()
+        
+        # Try to save to SQLite if BookService is available and SQLite is enabled
+        if (hasattr(self, 'book_service') and 
+            self.book_service and 
+            hasattr(self.book_service, 'database_service') and 
+            self.book_service.database_service and 
+            hasattr(self.book_service.database_service, 'use_sqlite') and 
+            self.book_service.database_service.use_sqlite):
+            try:
+                # Create files array with the current file info (new schema)
+                files_array = [{
+                    "filename": metadata.get("original_filename", ""),
+                    "file_type": metadata.get("file_type", ""),
+                    "file_size": metadata.get("file_size", 0),
+                    "file_path": metadata.get("file_path", ""),
+                    "hash": metadata.get("file_hash", "")
+                }]
+                
+                full_metadata = {
+                    "id": book_id,
+                    "title": metadata.get("title", ""),
+                    "author": metadata.get("author", ""),
+                    "contributor": metadata.get("contributor", ""),
+                    "isbn": metadata.get("isbn", ""),
+                    "publisher": metadata.get("publisher", ""),
+                    "year": metadata.get("year", ""),
+                    "pages": metadata.get("pages", ""),
+                    "folder_name": metadata.get("folder_name", ""),
+                    "date_added": metadata.get("date_added", ""),
+                    "extraction_method": metadata.get("extraction_method", ""),
+                    "extraction_confidence": metadata.get("extraction_confidence", 0.0),
+                    "media_type": metadata.get("media_type", "book"),
+                    "metadata_json": json.dumps(metadata, ensure_ascii=False),
+                    "files": files_array
+                }
+                
+                success = self.book_service.database_service.insert_book(full_metadata)
+                if success:
+                    print(f"✅ Book {book_id} saved to SQLite")
+                else:
+                    print(f"⚠️ Failed to save book {book_id} to SQLite")
+            except Exception as e:
+                print(f"⚠️ Error saving to SQLite: {e}")
+        
         print(f"✅ Book successfully processed from review queue: {metadata['title']}")
         
         # Automatically extract full text for PDFs (part of review approval)
@@ -1686,6 +1731,17 @@ class MetadataExtractor:
                         print(f"  ⚠️ Text extraction failed: {text_result.get('text', 'Unknown error')}")
                 except Exception as e:
                     print(f"  ⚠️ Text extraction error: {e}")
+        
+        # Also save to SQLite if available
+        if hasattr(self, 'book_service') and self.book_service.database_service.use_sqlite:
+            try:
+                success = self.book_service.database_service.insert_book(metadata)
+                if success:
+                    print(f"✅ Book {book_id} also saved to SQLite")
+                else:
+                    print(f"⚠️ Failed to save book {book_id} to SQLite")
+            except Exception as e:
+                print(f"⚠️ SQLite save error: {e}")
         
         return book_id
     
