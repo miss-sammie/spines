@@ -9,7 +9,7 @@ ENV PYTHONPATH=/app/src
 RUN apt-get update && apt-get install -y \
     # Core system tools
     file less bash coreutils gawk sed grep \
-    curl wget \
+    curl wget git vim nano \
     # Python and pip
     python3 python3-pip python3-dev \
     # Document processing
@@ -20,14 +20,26 @@ RUN apt-get update && apt-get install -y \
     p7zip-full \
     # Additional dependencies for v2.0
     python3-lxml python3-watchdog \
+    # Development tools
+    htop procps \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy requirements and install production dependencies only
+# Copy requirements and install dependencies (including dev dependencies)
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Install development dependencies
+RUN pip3 install --no-cache-dir \
+    pytest==7.4.3 \
+    pytest-flask==1.3.0 \
+    pytest-cov==4.1.0 \
+    black==23.7.0 \
+    flake8==6.0.0 \
+    mypy==1.5.1 \
+    ipython==8.14.0
 
 # Copy application code
 COPY src/ ./src/
@@ -36,21 +48,21 @@ COPY static/ ./static/
 # Create necessary directories
 RUN mkdir -p /app/data /app/books /app/temp /app/logs
 
-# Set up proper permissions for production
+# Set up proper permissions for development
 RUN chmod -R 755 /app/src && \
     chmod -R 755 /app/static && \
     chmod -R 777 /app/temp && \
     chmod -R 777 /app/logs
 
-# Health check for production
+# Health check for development
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8888/api/health || exit 1
 
 # Volume mount points
-VOLUME ["/app/books", "/app/data", "/app/logs", "/app/temp"]
+VOLUME ["/app/books", "/app/data", "/app/logs", "/app/src", "/app/static"]
 
 # Expose port
 EXPOSE 8888
 
-# Run the production application
-CMD ["python3", "-m", "src.main"] 
+# Run the development application with auto-reload
+CMD ["python3", "-m", "src.main", "--dev"] 

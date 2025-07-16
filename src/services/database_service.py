@@ -15,7 +15,7 @@ class DatabaseService:
     def __init__(self, config):
         self.config = config
         self.db_path = config.DATA_PATH / 'library.db'
-        self.use_sqlite = False  # Feature flag for safe migration
+        self.use_sqlite = True  # Feature flag for safe migration - ENABLED
         
         # Initialize database if it doesn't exist
         if not self.db_path.exists():

@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  spines-dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: spines-development
+    ports:
+      - "8888:8888"  # Development port
+    volumes:
+      # Books library
+      - ./books:/app/books:rw
+      # Data persistence
+      - ./data:/app/data:rw
+      - ./logs:/app/logs:rw
+      # Hot reload for development
+      - ./src:/app/src:rw
+      - ./static:/app/static:rw
+      - ./temp:/app/temp:rw
+    environment:
+      - SPINES_HOST=0.0.0.0
+      - SPINES_PORT=8888
+      - FLASK_ENV=development
+      - FLASK_DEBUG=true
+      - SPINES_LOG_LEVEL=DEBUG
+      - SPINES_ACCESS_MODE=local
+      - SPINES_PUBLIC_READ_ONLY=false
+      - SPINES_ADMIN_USERS=hal,whisper
+      - SPINES_BOOKS_PATH=/app/books
+      - SPINES_DATA_PATH=/app/data
+      - SPINES_TEMP_PATH=/app/temp
+      - SPINES_LOGS_PATH=/app/logs
+      - PYTHONPATH=/app/src
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - spines-dev-network
+    command: python3 -m src.main --dev
+
+networks:
+  spines-dev-network:
+    driver: bridge 

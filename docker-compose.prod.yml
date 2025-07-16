@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  spines-prod:
+    build: .
+    container_name: spines-production
+    ports:
+      - "8888:8888"  # Production port
+    volumes:
+      # Books library
+      - ./books:/app/books:rw
+      # Data persistence
+      - ./data:/app/data:rw
+      - ./logs:/app/logs:rw
+      # Production temp directory
+      - ./temp:/app/temp:rw
+    environment:
+      - SPINES_HOST=0.0.0.0
+      - SPINES_PORT=8888
+      - FLASK_ENV=production
+      - FLASK_DEBUG=false
+      - SPINES_LOG_LEVEL=WARN
+      - SPINES_ACCESS_MODE=local
+      - SPINES_PUBLIC_READ_ONLY=false
+      - SPINES_ADMIN_USERS=hal,whisper
+      - SPINES_BOOKS_PATH=/app/books
+      - SPINES_DATA_PATH=/app/data
+      - SPINES_TEMP_PATH=/app/temp
+      - SPINES_LOGS_PATH=/app/logs
+      - PYTHONPATH=/app/src
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - spines-prod-network
+
+  cloudflared-prod:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel-spines
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TOKEN}
+    environment:
+      - CLOUDFLARE_TOKEN=${CLOUDFLARE_TOKEN}
+    depends_on:
+      - spines-prod
+    restart: unless-stopped
+    network_mode: host
+
+networks:
+  spines-prod-network:
+    driver: bridge 
