@@ -306,13 +306,13 @@
 
 .book-title {
     font-weight: bold;
-    font-size: 14px;
+    font-size: 16px;
     margin-bottom: 5px;
     line-height: 1.2;
 }
 
 .book-author {
-    font-size: 12px;
+    font-size: 14px;
     margin-bottom: 3px;
     color: #333;
 }

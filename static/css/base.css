@@ -1,6 +1,15 @@
 /* spines - hal and whisper's pdf library */
 /* Base styles, typography, and core layout */
 
+/* Gorton Digital font */
+@font-face {
+    font-family: 'Gorton Digital';
+    src: url('../Gorton-Digital-Light.ttf.woff') format('woff');
+    font-weight: lighter;
+    font-style: normal;
+    font-display: swap;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -8,11 +17,11 @@
 }
 
 body {
-    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-family: 'Gorton Digital', 'Monaco', 'Menlo', 'Consolas', monospace;
     background: #f0f0f0;
     color: #000;
     line-height: 1.4;
-    font-size: 12px;
+    font-size: 14px;
     margin: 0;
     padding: 0;
     overflow-x: hidden;
