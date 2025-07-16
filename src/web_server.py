@@ -10,6 +10,7 @@ from services.text_service import TextService
 from services.file_service import FileService
 from services.review_service import ReviewService
 from services.ocr_service import OCRService
+from services.database_service import DatabaseService
 from routes.main import main_bp
 from routes.admin import admin_bp
 from routes.collections import collections_bp
@@ -47,6 +48,7 @@ def create_app(config):
     app.file_service = FileService(config)
     app.review_service = ReviewService(config)
     app.ocr_service = OCRService(config)
+    app.database_service = DatabaseService(config)
     
     # Pass services to MetadataExtractor
     from src.metadata_extractor import MetadataExtractor
@@ -75,6 +77,52 @@ def create_app(config):
             'version': '2.0',
             'access_mode': config.ACCESS_MODE
         }
+    
+    # Database migration management endpoints
+    @app.route('/api/database/status')
+    def database_status():
+        """Get database status and migration information"""
+        try:
+            sqlite_enabled = app.database_service.use_sqlite
+            sqlite_exists = app.database_service.db_path.exists()
+            json_count = len(app.book_service.load_library().get('books', {}))
+            sqlite_count = app.database_service.count_books() if sqlite_exists else 0
+            
+            return {
+                'sqlite_enabled': sqlite_enabled,
+                'sqlite_exists': sqlite_exists,
+                'json_books': json_count,
+                'sqlite_books': sqlite_count,
+                'migration_ready': sqlite_exists and sqlite_count > 0,
+                'current_source': 'sqlite' if sqlite_enabled and sqlite_exists else 'json'
+            }
+        except Exception as e:
+            logger.error(f"Error getting database status: {e}")
+            return {'error': str(e)}, 500
+    
+    @app.route('/api/database/enable-sqlite', methods=['POST'])
+    def enable_sqlite():
+        """Enable SQLite mode"""
+        try:
+            app.database_service.enable_sqlite()
+            app.book_service.enable_sqlite()
+            logger.info("SQLite mode enabled via API")
+            return {'success': True, 'message': 'SQLite mode enabled'}
+        except Exception as e:
+            logger.error(f"Error enabling SQLite: {e}")
+            return {'error': str(e)}, 500
+    
+    @app.route('/api/database/disable-sqlite', methods=['POST'])
+    def disable_sqlite():
+        """Disable SQLite mode (rollback to JSON)"""
+        try:
+            app.database_service.disable_sqlite()
+            app.book_service.disable_sqlite()
+            logger.info("SQLite mode disabled via API")
+            return {'success': True, 'message': 'SQLite mode disabled, using JSON fallback'}
+        except Exception as e:
+            logger.error(f"Error disabling SQLite: {e}")
+            return {'error': str(e)}, 500
     
     # Debug endpoint to check static files
     @app.route('/api/debug/static')
@@ -110,7 +158,5 @@ def create_app(config):
             'is_public': app.access_control.is_public_request(request),
             'headers': dict(request.headers)
         }
-    
-    logger.info(f"Flask app created with access mode: {config.ACCESS_MODE}")
     
     return app 

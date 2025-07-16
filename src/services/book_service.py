@@ -1,11 +1,12 @@
 """
 Book Service for Spines 2.0
-Business logic for book operations
+Business logic for book operations with SQLite migration support
 """
 import json
 from pathlib import Path
 from utils.logging import get_logger
 from flask import current_app
+from .database_service import DatabaseService
 
 logger = get_logger(__name__)
 
@@ -13,6 +14,7 @@ class BookService:
     def __init__(self, config):
         self.config = config
         self.library_file = config.get_library_metadata_path()
+        self.database_service = DatabaseService(config)
         
     def load_library(self):
         """Load library metadata"""
@@ -62,7 +64,23 @@ class BookService:
             raise
     
     def get_books(self, page=1, limit=None, search=None, filters=None):
-        """Get books with optional pagination and filtering, loading full metadata from individual files"""
+        """Get books with optional pagination and filtering, using SQLite if available"""
+        # Try SQLite first if enabled
+        if self.database_service.use_sqlite:
+            try:
+                books = self.database_service.get_books(page=page, limit=limit, search=search)
+                if books:
+                    logger.info(f"Retrieved {len(books)} books from SQLite")
+                    return books
+            except Exception as e:
+                logger.warning(f"SQLite query failed, falling back to JSON: {e}")
+        
+        # Fallback to JSON method
+        logger.info("Using JSON fallback for get_books")
+        return self._get_books_from_json(page, limit, search, filters)
+    
+    def _get_books_from_json(self, page=1, limit=None, search=None, filters=None):
+        """Get books from JSON (original method as fallback)"""
         library = self.load_library()
         book_summaries = library.get('books', {})
         books = []
@@ -115,7 +133,23 @@ class BookService:
         return books
     
     def get_book(self, book_id):
-        """Get a specific book by ID, loading from per-book metadata.json if available"""
+        """Get a specific book by ID, using SQLite if available"""
+        # Try SQLite first if enabled
+        if self.database_service.use_sqlite:
+            try:
+                book = self.database_service.get_book(book_id)
+                if book:
+                    logger.info(f"Retrieved book {book_id} from SQLite")
+                    return book
+            except Exception as e:
+                logger.warning(f"SQLite query failed for book {book_id}, falling back to JSON: {e}")
+        
+        # Fallback to JSON method
+        logger.info(f"Using JSON fallback for get_book {book_id}")
+        return self._get_book_from_json(book_id)
+    
+    def _get_book_from_json(self, book_id):
+        """Get a specific book by ID from JSON (original method as fallback)"""
         library = self.load_library()
         summary = library.get('books', {}).get(book_id)
         if not summary:
@@ -143,12 +177,19 @@ class BookService:
             return summary
     
     def update_book(self, book_id, metadata):
-        """Update book metadata in both library.json and per-book metadata.json.
-
-        If a change to author, title, year or isbn would alter the canonical folder
-        name, this method will also rename the folder and contained files so the
-        on-disk layout stays in sync with the metadata.
-        """
+        """Update book metadata in both SQLite and JSON systems"""
+        # Update in SQLite if enabled
+        if self.database_service.use_sqlite:
+            try:
+                success = self.database_service.update_book(book_id, metadata)
+                if success:
+                    logger.info(f"Updated book {book_id} in SQLite")
+                else:
+                    logger.warning(f"Failed to update book {book_id} in SQLite")
+            except Exception as e:
+                logger.error(f"Error updating book {book_id} in SQLite: {e}")
+        
+        # Always update JSON as backup
         library = self.load_library()
         if book_id not in library.get('books', {}):
             raise ValueError(f"Book {book_id} not found")
@@ -189,7 +230,19 @@ class BookService:
         return library_record
     
     def delete_book(self, book_id):
-        """Delete a book"""
+        """Delete a book from both SQLite and JSON systems"""
+        # Delete from SQLite if enabled
+        if self.database_service.use_sqlite:
+            try:
+                success = self.database_service.delete_book(book_id)
+                if success:
+                    logger.info(f"Deleted book {book_id} from SQLite")
+                else:
+                    logger.warning(f"Failed to delete book {book_id} from SQLite")
+            except Exception as e:
+                logger.error(f"Error deleting book {book_id} from SQLite: {e}")
+        
+        # Delete from JSON system
         library = self.load_library()
         
         if book_id not in library.get('books', {}):
@@ -227,6 +280,19 @@ class BookService:
     
     def get_library_stats(self):
         """Get library statistics"""
+        # Try SQLite first if enabled
+        if self.database_service.use_sqlite:
+            try:
+                sqlite_count = self.database_service.count_books()
+                if sqlite_count > 0:
+                    return {
+                        'total_books': sqlite_count,
+                        'source': 'sqlite'
+                    }
+            except Exception as e:
+                logger.warning(f"SQLite stats failed, falling back to JSON: {e}")
+        
+        # Fallback to JSON
         library = self.load_library()
         books = library.get('books', {})
         
@@ -240,8 +306,19 @@ class BookService:
                 book for book in books.values() 
                 if book.get('isbn')
             ]),
-            'version': library.get('metadata', {}).get('version', '2.0')
+            'version': library.get('metadata', {}).get('version', '2.0'),
+            'source': 'json'
         }
+    
+    def enable_sqlite(self):
+        """Enable SQLite mode"""
+        self.database_service.enable_sqlite()
+        logger.info("SQLite mode enabled in BookService")
+    
+    def disable_sqlite(self):
+        """Disable SQLite mode (rollback to JSON)"""
+        self.database_service.disable_sqlite()
+        logger.info("SQLite mode disabled in BookService, using JSON fallback")
     
     def extract_text(self, book_id):
         """Extract text from book using OCR"""
@@ -291,136 +368,112 @@ class BookService:
             }
             
         except Exception as e:
-            logger.exception(f"Error extracting text from book {book_id}")
-            return {"success": False, "error": f"Text extraction failed: {str(e)}"}
-
+            logger.error(f"Error extracting text from book {book_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
     def enhanced_isbn_lookup(self, isbn: str) -> dict:
-        """Enhanced ISBN lookup that tries multiple sources"""
-        logger.info(f"📚 Looking up ISBN: {isbn}")
-        
-        # Try isbnlib first (covers Open Library, Google Books, etc.)
+        """Enhanced ISBN lookup with multiple sources"""
         try:
-            # Clean the ISBN
             import isbnlib
-            clean_isbn = isbn.replace('-', '').replace(' ', '')
             
-            # Try multiple isbnlib providers in order
-            providers = ['default', 'openl', 'goob']  # openlibrary, google books
+            # Clean ISBN
+            isbn = isbnlib.canonical(isbn)
+            if not isbnlib.is_isbn10(isbn) and not isbnlib.is_isbn13(isbn):
+                return {}
             
-            for provider in providers:
+            # Try multiple sources
+            sources = ['openl', 'goob', 'wiki']
+            metadata = {}
+            
+            for source in sources:
                 try:
-                    if provider == 'default':
-                        meta = isbnlib.meta(clean_isbn)
-                    else:
-                        meta = isbnlib.meta(clean_isbn, service=provider)
-                    
-                    if meta:
-                        logger.info(f"  ✅ Found metadata via {provider}: {meta.get('Title', 'N/A')}")
-                        
-                        # Convert to our format
-                        result = {}
-                        if meta.get('Title'):
-                            result['title'] = meta['Title']
-                        if meta.get('Authors'):
-                            result['author'] = ', '.join(meta['Authors'])
-                        if meta.get('Year'):
-                            result['year'] = int(meta['Year'])
-                        if meta.get('Publisher'):
-                            result['publisher'] = meta['Publisher']
-                        
-                        return result
-                        
+                    source_metadata = isbnlib.meta(isbn, service=source)
+                    if source_metadata:
+                        metadata.update(source_metadata)
+                        break
                 except Exception as e:
-                    logger.warning(f"  ⚠️ {provider} lookup failed: {e}")
+                    logger.debug(f"ISBN lookup failed for source {source}: {e}")
                     continue
             
-            logger.info(f"  ❌ No results from isbnlib providers")
+            if metadata:
+                # Normalize field names
+                normalized = {}
+                field_mapping = {
+                    'Title': 'title',
+                    'Authors': 'author',
+                    'Year': 'year',
+                    'Publisher': 'publisher',
+                    'ISBN-13': 'isbn',
+                    'ISBN-10': 'isbn_10'
+                }
+                
+                for old_key, new_key in field_mapping.items():
+                    if old_key in metadata:
+                        normalized[new_key] = metadata[old_key]
+                
+                # Handle authors list
+                if 'author' in normalized and isinstance(normalized['author'], list):
+                    normalized['author'] = ', '.join(normalized['author'])
+                
+                return normalized
+            
+            return {}
             
         except Exception as e:
-            logger.error(f"  💥 ISBN lookup failed completely: {e}")
-        
-        return {} 
-
+            logger.error(f"Enhanced ISBN lookup failed: {e}")
+            return {}
+    
     def _clean_for_filename(self, s: str, max_length: int = 50) -> str:
-        """Utility to sanitise a string so it can be safely used in a filename."""
+        """Clean string for use in filename"""
         import re
         if not s:
-            return "Unknown"
-        # Remove any character that is not alphanumeric, whitespace, hyphen or underscore
+            return 'Unknown'
         cleaned = re.sub(r'[^\w\s\-]', '', s)
-        # Collapse whitespace
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-        # Replace spaces with underscores
         cleaned = cleaned.replace(' ', '_')
         return cleaned[:max_length]
-
+    
     def _compute_folder_name(self, metadata: dict) -> str:
-        """Re-compute the canonical folder / base filename for a book based on current metadata.
-
-        It mirrors the logic in MetadataExtractor.normalize_filename so both CLI and
-        web edits stay consistent without importing that heavy module here.
-        """
-        author   = self._clean_for_filename(str(metadata.get('author', 'Unknown_Author')).split(',')[0], 30)
-        title    = self._clean_for_filename(str(metadata.get('title',  'Unknown_Title')), 40)
-        year     = str(metadata.get('year', 'Unknown_Year'))
-        media_id = metadata.get('isbn') or 'no_id'
-        return f"{author}_{title}_{year}_{media_id}"
-
+        """Compute canonical folder name from metadata"""
+        author = self._clean_for_filename(str(metadata.get('author', 'Unknown_Author')).split(',')[0], 30)
+        title = self._clean_for_filename(metadata.get('title', 'Unknown_Title'), 40)
+        year = str(metadata.get('year', 'Unknown_Year'))
+        ident = metadata.get('isbn') or 'no_id'
+        return f"{author}_{title}_{year}_{ident}"
+    
     def _rename_book_assets(self, old_folder: str, new_folder: str) -> str:
-        """Physically rename the on-disk folder and contained files.
-
-        If the target folder already exists we will append a numerical suffix
-        to avoid collisions (foldername_1, _2, ...).
-        """
+        """Rename book folder and contained files"""
+        import shutil
         from pathlib import Path
-        import shutil, os
-
-        books_root = Path(self.config.BOOKS_PATH)
-        old_dir    = books_root / old_folder
+        
+        old_dir = Path(self.config.BOOKS_PATH) / old_folder
+        new_dir = Path(self.config.BOOKS_PATH) / new_folder
+        
         if not old_dir.exists():
-            # Might be a legacy layout with files at root – bail out for safety.
-            logger.warning(f"Old folder '{old_dir}' not found. Skipping physical rename.")
-            return
-
-        # Ensure new folder name is unique
-        new_dir = books_root / new_folder
-        if new_dir.exists():
-            suffix = 1
-            while (books_root / f"{new_folder}_{suffix}").exists():
-                suffix += 1
-            new_folder = f"{new_folder}_{suffix}"
-            new_dir = books_root / new_folder
-
-        logger.info(f"Renaming book folder '{old_dir.name}' -> '{new_dir.name}'")
-        old_dir.rename(new_dir)
-
-        # Rename files inside the folder that start with the old prefix
-        for f in new_dir.iterdir():
-            if f.is_file() and f.name.startswith(old_folder):
-                new_name = f.name.replace(old_folder, new_folder, 1)
-                f.rename(new_dir / new_name)
-
-        # Also attempt to rename any orphaned root-level files (rare)
-        for ext in ['.pdf', '.epub', '.mobi', '.azw', '.azw3', '.djvu', '.djv', '.txt']:
-            legacy_file = books_root / f"{old_folder}{ext}"
-            if legacy_file.exists():
-                legacy_file.rename(books_root / f"{new_folder}{ext}")
-
-        # Update metadata.json inside the folder, if present
-        meta_path = new_dir / 'metadata.json'
-        if meta_path.exists():
-            try:
-                with open(meta_path, 'r', encoding='utf-8') as fh:
-                    meta = json.load(fh)
-                meta['folder_name'] = new_folder
-                # Update common filename fields if present
-                for key in ['filename', 'pdf_filename', 'text_filename']:
-                    if key in meta and meta[key]:
-                        base, ext = os.path.splitext(meta[key])
-                        meta[key] = f"{new_folder}{ext}"
-                with open(meta_path, 'w', encoding='utf-8') as fh:
-                    json.dump(meta, fh, indent=2, ensure_ascii=False)
-            except Exception as e:
-                logger.warning(f"Failed to update inner metadata.json after rename: {e}")
-
-        return new_folder  # Return the possibly suffixed final folder name 
+            logger.warning(f"Old folder doesn't exist: {old_dir}")
+            return new_folder
+        
+        # Ensure target folder is unique
+        suffix = 1
+        final_new_folder = new_folder
+        while new_dir.exists():
+            final_new_folder = f"{new_folder}_{suffix}"
+            new_dir = Path(self.config.BOOKS_PATH) / final_new_folder
+            suffix += 1
+        
+        try:
+            old_dir.rename(new_dir)
+            logger.info(f"Renamed folder: {old_folder} -> {final_new_folder}")
+            
+            # Rename internal files prefixed with old folder name
+            for f in new_dir.iterdir():
+                if f.is_file() and f.name.startswith(old_folder):
+                    new_name = f.name.replace(old_folder, final_new_folder, 1)
+                    f.rename(new_dir / new_name)
+                    logger.info(f"Renamed file: {f.name} -> {new_name}")
+            
+            return final_new_folder
+            
+        except Exception as e:
+            logger.error(f"Failed to rename folder {old_folder}: {e}")
+            return old_folder 
