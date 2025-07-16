@@ -10,8 +10,26 @@ $ProjectDir = Split-Path -Parent $ScriptDir
 
 Set-Location $ProjectDir
 
+# Function to create necessary directories
+function Create-Directories {
+    Write-Host "Setting up Spines development environment..." -ForegroundColor Green
+    
+    # Create necessary directories if they don't exist
+    $directories = @("books", "data", "logs", "temp")
+    
+    foreach ($dir in $directories) {
+        if (!(Test-Path $dir)) {
+            Write-Host "Creating directory: $dir" -ForegroundColor Yellow
+            New-Item -ItemType Directory -Path $dir -Force
+        } else {
+            Write-Host "Directory exists: $dir" -ForegroundColor Green
+        }
+    }
+}
+
 switch ($Action.ToLower()) {
     "start" {
+        Create-Directories
         Write-Host "🚀 Starting Spines 2.0 Development Environment..." -ForegroundColor Green
         docker-compose -f docker-compose.dev.yml up --build
     }
@@ -20,6 +38,7 @@ switch ($Action.ToLower()) {
         docker-compose -f docker-compose.dev.yml down
     }
     "restart" {
+        Create-Directories
         Write-Host "🔄 Restarting Spines 2.0 Development Environment..." -ForegroundColor Cyan
         docker-compose -f docker-compose.dev.yml down
         docker-compose -f docker-compose.dev.yml up --build

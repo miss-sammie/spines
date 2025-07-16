@@ -10,8 +10,26 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
 
+# Function to create necessary directories
+create_directories() {
+    echo "Setting up Spines development environment..."
+    
+    # Create necessary directories if they don't exist
+    directories=("books" "data" "logs" "temp")
+    
+    for dir in "${directories[@]}"; do
+        if [ ! -d "$dir" ]; then
+            echo "Creating directory: $dir"
+            mkdir -p "$dir"
+        else
+            echo "Directory exists: $dir"
+        fi
+    done
+}
+
 case "${1:-start}" in
     start)
+        create_directories
         echo "🚀 Starting Spines 2.0 Development Environment..."
         docker-compose -f docker-compose.dev.yml up --build
         ;;
@@ -20,6 +38,7 @@ case "${1:-start}" in
         docker-compose -f docker-compose.dev.yml down
         ;;
     restart)
+        create_directories
         echo "🔄 Restarting Spines 2.0 Development Environment..."
         docker-compose -f docker-compose.dev.yml down
         docker-compose -f docker-compose.dev.yml up --build
