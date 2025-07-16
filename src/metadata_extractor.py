@@ -340,7 +340,7 @@ class MetadataExtractor:
     def generate_book_id(self, file_path: str) -> str:
         """Generate unique ID for book based on file hash"""
         with open(file_path, 'rb') as f:
-            file_hash = hashlib.md5(f.read()).hexdigest()[:12]
+            file_hash = hashlib.sha256(f.read()).hexdigest()
         return file_hash
     
     def extract_metadata_with_escalation(self, pdf_path: Path) -> ExtractionResult:
@@ -1170,12 +1170,16 @@ class MetadataExtractor:
             self.book_service.database_service.use_sqlite):
             try:
                 # Create files array with the current file info (new schema)
+                # Use the new file path where the file was moved to
+                actual_file_path = str(new_file_path)
+                
+                # Create files array matching existing schema
                 files_array = [{
+                    "hash": book_id,  # Use book_id as hash (consistent with existing)
                     "filename": metadata.get("original_filename", ""),
-                    "file_type": metadata.get("file_type", ""),
-                    "file_size": metadata.get("file_size", 0),
-                    "file_path": metadata.get("file_path", ""),
-                    "hash": metadata.get("file_hash", "")
+                    "url": f"/api/books/{book_id}/file?filename={metadata.get('original_filename', '')}",
+                    "type": metadata.get("file_type", ""),
+                    "size": metadata.get("file_size", 0)
                 }]
                 
                 full_metadata = {
