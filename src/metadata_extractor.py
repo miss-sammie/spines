@@ -862,7 +862,6 @@ class MetadataExtractor:
             "author": "Unknown",
             "year": None,
             "isbn": None,
-            "issn": None,
             "url": None,
             "publisher": None,
             "pages": 0,
@@ -1988,10 +1987,6 @@ class MetadataExtractor:
         filename = (metadata.get("original_filename") or "").lower()
         
         # EXPLICIT indicators only - be very conservative
-        
-        # Has ISSN = definitely an article/journal
-        if metadata.get("issn"):
-            return MediaType.BOOK.value
         
         # Has URL but no ISBN = web resource
         if metadata.get("url") and not metadata.get("isbn"):
