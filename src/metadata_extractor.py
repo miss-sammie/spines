@@ -672,13 +672,24 @@ class MetadataExtractor:
                     if isbn:
                         metadata["isbn"] = isbn
                         isbn_found = True
-                        confidence += 0.3
                         
                         # Enhance with ISBN lookup
                         isbn_metadata = self.book_service.enhanced_isbn_lookup(isbn)
                         if isbn_metadata:
                             metadata.update(isbn_metadata)
-                            confidence += 0.2
+                            confidence += 0.3  # Full boost only if ISBN lookup succeeds
+                        else:
+                            # ISBN found but can't be validated - fail fast to manual review
+                            print(f"  ❌ ISBN {isbn} found but cannot be validated - sending to manual review")
+                            return ExtractionResult(
+                                method=ExtractionMethod.CALIBRE_CONVERT,
+                                success=False,
+                                metadata=metadata,
+                                confidence=0.2,  # Low confidence to trigger manual review
+                                isbn_found=True,
+                                text_extracted=True,
+                                error=f"ISBN {isbn} found but cannot be validated with external services"
+                            )
                     
                     return ExtractionResult(
                         method=ExtractionMethod.CALIBRE_CONVERT,
@@ -1196,6 +1207,9 @@ class MetadataExtractor:
                     "extraction_method": metadata.get("extraction_method", ""),
                     "extraction_confidence": metadata.get("extraction_confidence", 0.0),
                     "media_type": metadata.get("media_type", "book"),
+                    "read_by": metadata.get("read_by", []),
+                    "tags": metadata.get("tags", []),
+                    "notes": metadata.get("notes", ""),
                     "metadata_json": json.dumps(metadata, ensure_ascii=False),
                     "files": files_array
                 }
