@@ -328,7 +328,9 @@ class BookService:
             if not book:
                 return {"success": False, "error": "Book not found"}
             
-            text_service = current_app.text_service
+            # Create text service instance
+            from services.text_service import TextService
+            text_service = TextService(self.config)
             
             # Find the PDF file
             folder_name = book.get("folder_name", book_id)

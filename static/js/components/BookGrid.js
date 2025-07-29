@@ -163,8 +163,9 @@ class BookGrid {
                 return yearB - yearA; // Newest first
             },
             recent: (a, b) => {
-                const dateA = new Date(a.date_added || 0);
-                const dateB = new Date(b.date_added || 0);
+                // Use created_at if available, fallback to date_added for legacy data
+                const dateA = new Date(a.created_at || a.date_added || 0);
+                const dateB = new Date(b.created_at || b.date_added || 0);
                 return dateB - dateA; // Most recent first
             }
         };

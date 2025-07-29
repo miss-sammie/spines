@@ -340,7 +340,7 @@ class MetadataExtractor:
     def generate_book_id(self, file_path: str) -> str:
         """Generate unique ID for book based on file hash"""
         with open(file_path, 'rb') as f:
-            file_hash = hashlib.sha256(f.read()).hexdigest()
+            file_hash = hashlib.md5(f.read()).hexdigest()[:12]
         return file_hash
     
     def extract_metadata_with_escalation(self, pdf_path: Path) -> ExtractionResult:
