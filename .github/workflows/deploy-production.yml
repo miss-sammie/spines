@@ -3,6 +3,9 @@ name: Deploy Spines 2.0 to Production
 on:
   push:
     branches: [ master ]
+  pull_request:
+    branches: [ master ]
+    types: [ closed ]
 
 jobs:
   deploy-production:
@@ -34,7 +37,7 @@ jobs:
     #                  • Windows: C:\Users\samrc\Desktop\Code\spines_test\spines-2.0
     # --------------------------------------------------------------------
     - name: Deploy Spines 2.0
-      if: github.event_name == 'push'
+      if: (github.event_name == 'push') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
       shell: powershell
       working-directory: C:\\Users\\samrc\\Desktop\\Code\\spines_test\\spines-2.0
       run: |
