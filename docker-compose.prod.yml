@@ -1,11 +1,12 @@
 version: '3.8'
 
 services:
-  spines-prod:
+  # Tailscale/Private Access - Full permissions
+  spines-tailscale:
     build: .
-    container_name: spines-production
+    container_name: spines-tailscale-prod
     ports:
-      - "8889:8888"  # Production port
+      - "8888:8888"  # Tailscale access (full permissions)
     volumes:
       # Books library
       - ./books:/app/books:rw
@@ -19,9 +20,42 @@ services:
       - SPINES_PORT=8888
       - FLASK_ENV=production
       - FLASK_DEBUG=false
-      - SPINES_LOG_LEVEL=WARN
-      - SPINES_ACCESS_MODE=local
+      - SPINES_LOG_LEVEL=INFO
+      - SPINES_ACCESS_MODE=local  # Local mode = full access
       - SPINES_PUBLIC_READ_ONLY=false
+      - SPINES_ADMIN_USERS=hal,whisper
+      - SPINES_BOOKS_PATH=/app/books
+      - SPINES_DATA_PATH=/app/data
+      - SPINES_TEMP_PATH=/app/temp
+      - SPINES_LOGS_PATH=/app/logs
+      - PYTHONPATH=/app/src
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - spines-prod-network
+
+  # Public Access - Read-only (for Cloudflare tunnel)
+  spines-prod:
+    build: .
+    container_name: spines-production
+    ports:
+      - "8889:8888"  # Production port
+    volumes:
+      # Books library (read-only for safety)
+      - ./books:/app/books:ro
+      # Data persistence
+      - ./data:/app/data:rw
+      - ./logs:/app/logs:rw
+      # Production temp directory
+      - ./temp:/app/temp:rw
+    environment:
+      - SPINES_HOST=0.0.0.0
+      - SPINES_PORT=8888
+      - FLASK_ENV=production
+      - FLASK_DEBUG=false
+      - SPINES_LOG_LEVEL=WARN
+      - SPINES_ACCESS_MODE=public  # Public mode = read-only
+      - SPINES_PUBLIC_READ_ONLY=true
       - SPINES_ADMIN_USERS=hal,whisper
       - SPINES_BOOKS_PATH=/app/books
       - SPINES_DATA_PATH=/app/data
