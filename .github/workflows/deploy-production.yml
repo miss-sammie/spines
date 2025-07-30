@@ -36,7 +36,7 @@ jobs:
     - name: Deploy Spines 2.0
       if: github.event_name == 'push'
       shell: powershell
-      working-directory: "C:\Users\samrc\Desktop\Code\spines_test\spines-2.0"
+      working-directory: C:\\Users\\samrc\\Desktop\\Code\\spines_test\\spines-2.0
       run: |
         Write-Host "Executing deployment script from checkout: ${{ github.workspace }}"
         Write-Host "Running in project directory       : $(Get-Location)"
