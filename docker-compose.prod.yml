@@ -5,7 +5,7 @@ services:
     build: .
     container_name: spines-production
     ports:
-      - "8888:8888"  # Production port
+      - "8889:8888"  # Production port
     volumes:
       # Books library
       - ./books:/app/books:rw
