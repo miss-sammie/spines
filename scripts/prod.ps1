@@ -13,20 +13,20 @@ Set-Location $ProjectDir
 switch ($Action.ToLower()) {
     "start" {
         Write-Host " Starting Spines 2.0 Production Environment..." -ForegroundColor Green
-        docker-compose -f docker-compose.prod.yml up --build -d
+        docker-compose -f docker-compose.prod.yml --env-file .env up --build -d
         Write-Host " Production environment started!" -ForegroundColor Green
         Write-Host " Check status with: .\scripts\prod.ps1 status" -ForegroundColor Cyan
         Write-Host " View logs with: .\scripts\prod.ps1 logs" -ForegroundColor Cyan
     }
     "stop" {
         Write-Host " Stopping Spines 2.0 Production Environment..." -ForegroundColor Yellow
-        docker-compose -f docker-compose.prod.yml down
+        docker-compose -f docker-compose.prod.yml --env-file .env down
         Write-Host " Production environment stopped!" -ForegroundColor Green
     }
     "restart" {
         Write-Host " Restarting Spines 2.0 Production Environment..." -ForegroundColor Cyan
-        docker-compose -f docker-compose.prod.yml down
-        docker-compose -f docker-compose.prod.yml up --build -d
+        docker-compose -f docker-compose.prod.yml --env-file .env down
+        docker-compose -f docker-compose.prod.yml --env-file .env up --build -d
         Write-Host " Production environment restarted!" -ForegroundColor Green
     }
     "deploy" {
@@ -48,12 +48,12 @@ switch ($Action.ToLower()) {
         
         # Clean up and rebuild
         Write-Host " Cleaning up old containers..." -ForegroundColor Cyan
-        docker-compose -f docker-compose.prod.yml down
+        docker-compose -f docker-compose.prod.yml --env-file .env down
         docker system prune -f
         
         Write-Host "  Building and starting production environment..." -ForegroundColor Cyan
-        docker-compose -f docker-compose.prod.yml build --no-cache
-        docker-compose -f docker-compose.prod.yml up -d
+        docker-compose -f docker-compose.prod.yml --env-file .env build --no-cache
+        docker-compose -f docker-compose.prod.yml --env-file .env up -d
         
         # Wait and verify
         Write-Host " Waiting for services to be ready..." -ForegroundColor Cyan
@@ -73,12 +73,12 @@ switch ($Action.ToLower()) {
     }
     "logs" {
         Write-Host " Showing Spines 2.0 Production Logs..." -ForegroundColor Blue
-        docker-compose -f docker-compose.prod.yml logs -f
+        docker-compose -f docker-compose.prod.yml --env-file .env logs -f
     }
     "status" {
         Write-Host " Spines 2.0 Production Environment Status:" -ForegroundColor White
         Write-Host ""
-        docker-compose -f docker-compose.prod.yml ps
+        docker-compose -f docker-compose.prod.yml --env-file .env ps
         Write-Host ""
         Write-Host " Health Check:" -ForegroundColor White
         try {
@@ -115,8 +115,8 @@ switch ($Action.ToLower()) {
         git pull origin main
         
         # Rebuild and restart
-        docker-compose -f docker-compose.prod.yml down
-        docker-compose -f docker-compose.prod.yml up --build -d
+        docker-compose -f docker-compose.prod.yml --env-file .env down
+        docker-compose -f docker-compose.prod.yml --env-file .env up --build -d
         
         Write-Host " Production environment updated!" -ForegroundColor Green
     }
@@ -126,7 +126,7 @@ switch ($Action.ToLower()) {
     }
     "clean" {
         Write-Host " Cleaning up Spines 2.0 Production Environment..." -ForegroundColor Red
-        docker-compose -f docker-compose.prod.yml down -v
+        docker-compose -f docker-compose.prod.yml --env-file .env down -v
         docker system prune -f
     }
     default {
