@@ -12,34 +12,34 @@ Set-Location $ProjectDir
 
 switch ($Action.ToLower()) {
     "start" {
-        Write-Host "🚀 Starting Spines 2.0 Production Environment..." -ForegroundColor Green
+        Write-Host " Starting Spines 2.0 Production Environment..." -ForegroundColor Green
         docker-compose -f docker-compose.prod.yml up --build -d
-        Write-Host "✅ Production environment started!" -ForegroundColor Green
-        Write-Host "📊 Check status with: .\scripts\prod.ps1 status" -ForegroundColor Cyan
-        Write-Host "📋 View logs with: .\scripts\prod.ps1 logs" -ForegroundColor Cyan
+        Write-Host " Production environment started!" -ForegroundColor Green
+        Write-Host " Check status with: .\scripts\prod.ps1 status" -ForegroundColor Cyan
+        Write-Host " View logs with: .\scripts\prod.ps1 logs" -ForegroundColor Cyan
     }
     "stop" {
-        Write-Host "🛑 Stopping Spines 2.0 Production Environment..." -ForegroundColor Yellow
+        Write-Host " Stopping Spines 2.0 Production Environment..." -ForegroundColor Yellow
         docker-compose -f docker-compose.prod.yml down
-        Write-Host "✅ Production environment stopped!" -ForegroundColor Green
+        Write-Host " Production environment stopped!" -ForegroundColor Green
     }
     "restart" {
-        Write-Host "🔄 Restarting Spines 2.0 Production Environment..." -ForegroundColor Cyan
+        Write-Host " Restarting Spines 2.0 Production Environment..." -ForegroundColor Cyan
         docker-compose -f docker-compose.prod.yml down
         docker-compose -f docker-compose.prod.yml up --build -d
-        Write-Host "✅ Production environment restarted!" -ForegroundColor Green
+        Write-Host " Production environment restarted!" -ForegroundColor Green
     }
     "deploy" {
-        Write-Host "🚀 Deploying Spines 2.0 to Production..." -ForegroundColor Magenta
+        Write-Host " Deploying Spines 2.0 to Production..." -ForegroundColor Magenta
         
         # Pull latest changes
         if (Test-Path ".git") {
-            Write-Host "📥 Pulling latest changes..." -ForegroundColor Cyan
+            Write-Host " Pulling latest changes..." -ForegroundColor Cyan
             git pull origin main
         }
         
         # Ensure directories exist
-        Write-Host "📁 Ensuring directories exist..." -ForegroundColor Cyan
+        Write-Host " Ensuring directories exist..." -ForegroundColor Cyan
         @("books", "data", "logs", "temp") | ForEach-Object {
             if (!(Test-Path $_)) {
                 New-Item -ItemType Directory -Path $_ -Force | Out-Null
@@ -47,69 +47,69 @@ switch ($Action.ToLower()) {
         }
         
         # Clean up and rebuild
-        Write-Host "🧹 Cleaning up old containers..." -ForegroundColor Cyan
+        Write-Host " Cleaning up old containers..." -ForegroundColor Cyan
         docker-compose -f docker-compose.prod.yml down
         docker system prune -f
         
-        Write-Host "🏗️  Building and starting production environment..." -ForegroundColor Cyan
+        Write-Host "  Building and starting production environment..." -ForegroundColor Cyan
         docker-compose -f docker-compose.prod.yml build --no-cache
         docker-compose -f docker-compose.prod.yml up -d
         
         # Wait and verify
-        Write-Host "⏳ Waiting for services to be ready..." -ForegroundColor Cyan
+        Write-Host " Waiting for services to be ready..." -ForegroundColor Cyan
         Start-Sleep 15
         
         # Health check
         try {
             $response = Invoke-WebRequest -Uri "http://localhost:8888/api/health" -UseBasicParsing -TimeoutSec 10
-            Write-Host "✅ Health check passed - deployment successful!" -ForegroundColor Green
+            Write-Host " Health check passed - deployment successful!" -ForegroundColor Green
         }
         catch {
-            Write-Host "⚠️  Health check failed or endpoint not available" -ForegroundColor Yellow
+            Write-Host "  Health check failed or endpoint not available" -ForegroundColor Yellow
         }
         
-        Write-Host "🎉 Production deployment completed!" -ForegroundColor Green
-        Write-Host "🌐 Spines should be available at http://localhost:8888" -ForegroundColor Cyan
+        Write-Host " Production deployment completed!" -ForegroundColor Green
+        Write-Host " Spines should be available at http://localhost:8888" -ForegroundColor Cyan
     }
     "logs" {
-        Write-Host "📋 Showing Spines 2.0 Production Logs..." -ForegroundColor Blue
+        Write-Host " Showing Spines 2.0 Production Logs..." -ForegroundColor Blue
         docker-compose -f docker-compose.prod.yml logs -f
     }
     "status" {
-        Write-Host "📊 Spines 2.0 Production Environment Status:" -ForegroundColor White
+        Write-Host " Spines 2.0 Production Environment Status:" -ForegroundColor White
         Write-Host ""
         docker-compose -f docker-compose.prod.yml ps
         Write-Host ""
-        Write-Host "🔍 Health Check:" -ForegroundColor White
+        Write-Host " Health Check:" -ForegroundColor White
         try {
             $response = Invoke-WebRequest -Uri "http://localhost:8888/api/health" -UseBasicParsing
-            Write-Host "✅ Health check passed" -ForegroundColor Green
+            Write-Host " Health check passed" -ForegroundColor Green
         }
         catch {
-            Write-Host "❌ Health check failed" -ForegroundColor Red
+            Write-Host " Health check failed" -ForegroundColor Red
         }
     }
     "backup" {
-        Write-Host "💾 Creating backup of Spines 2.0 data..." -ForegroundColor Yellow
+        Write-Host " Creating backup of Spines 2.0 data..." -ForegroundColor Yellow
         $BackupDir = "backups\$(Get-Date -Format 'yyyyMMdd_HHmmss')"
         New-Item -ItemType Directory -Path $BackupDir -Force | Out-Null
         
         # Backup books
         if (Test-Path "books") {
-            Write-Host "📚 Backing up books..." -ForegroundColor Cyan
+            Write-Host " Backing up books..." -ForegroundColor Cyan
             Copy-Item -Path "books" -Destination $BackupDir -Recurse
         }
         
         # Backup data
         if (Test-Path "data") {
-            Write-Host "💿 Backing up data..." -ForegroundColor Cyan
+            Write-Host " Backing up data..." -ForegroundColor Cyan
             Copy-Item -Path "data" -Destination $BackupDir -Recurse
         }
         
-        Write-Host "✅ Backup created in: $BackupDir" -ForegroundColor Green
+        Write-Host " Backup created in: $BackupDir" -ForegroundColor Green
     }
     "update" {
-        Write-Host "🔄 Updating Spines 2.0 Production Environment..." -ForegroundColor Cyan
+        Write-Host " Updating Spines 2.0 Production Environment..." -ForegroundColor Cyan
         
         # Pull latest changes
         git pull origin main
@@ -118,14 +118,14 @@ switch ($Action.ToLower()) {
         docker-compose -f docker-compose.prod.yml down
         docker-compose -f docker-compose.prod.yml up --build -d
         
-        Write-Host "✅ Production environment updated!" -ForegroundColor Green
+        Write-Host " Production environment updated!" -ForegroundColor Green
     }
     "shell" {
-        Write-Host "🐚 Opening shell in Spines 2.0 Production Container..." -ForegroundColor Magenta
+        Write-Host " Opening shell in Spines 2.0 Production Container..." -ForegroundColor Magenta
         docker exec -it spines-production bash
     }
     "clean" {
-        Write-Host "🧹 Cleaning up Spines 2.0 Production Environment..." -ForegroundColor Red
+        Write-Host " Cleaning up Spines 2.0 Production Environment..." -ForegroundColor Red
         docker-compose -f docker-compose.prod.yml down -v
         docker system prune -f
     }
