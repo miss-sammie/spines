@@ -2,7 +2,7 @@ name: Deploy Spines 2.0 to Production
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   deploy-production:
