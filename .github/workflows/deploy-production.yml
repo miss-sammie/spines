@@ -57,5 +57,5 @@ jobs:
         if ("${{ job.status }}" -eq "success") {
           Write-Host "✅ Deployment to ${{ steps.env.outputs.ENVIRONMENT }} was successful."
         } else {
-          Write-Host "❌ Deployment failed."
+          Write-Host "❌ Deployment failed oops."
         }
