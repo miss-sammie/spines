@@ -1,0 +1,58 @@
+name: Deploy Spines 2.0 to Production
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy-production:
+    runs-on: self-hosted  # The job will run on your self-hosted runner
+    environment: Production
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Set the target environment (always "prod" when deploying from main)
+    - name: Set environment
+      id: env
+      shell: powershell
+      run: echo "ENVIRONMENT=prod" >> $env:GITHUB_OUTPUT
+
+    # --------------------------------------------------------------------
+    # CORE DEPLOY STEP
+    # --------------------------------------------------------------------
+    # We execute the *version-controlled* deploy.sh script that lives in the
+    # repository checkout ( ${{ github.workspace }} ).  However, we **run** it
+    # from the permanent project directory on the host so that the script has
+    # access to any local, un-tracked assets (books/, data/, .env, etc.).
+    #
+    # ⚠️  IMPORTANT:  Change the `working-directory` below to the path where
+    #                your Spines 2.0 project actually lives on the runner
+    #                machine.  Example paths:
+    #                  • Linux  : /opt/spines-2.0
+    #                  • Windows: C:\Users\samrc\Desktop\Code\spines_test\spines-2.0
+    # --------------------------------------------------------------------
+    - name: Deploy Spines 2.0
+      if: github.event_name == 'push'
+      shell: powershell
+      working-directory: "C:\Users\samrc\Desktop\Code\spines_test\spines-2.0"
+      run: |
+        Write-Host "Executing deployment script from checkout: ${{ github.workspace }}"
+        Write-Host "Running in project directory       : $(Get-Location)"
+
+        # Execute PowerShell production script, passing the action "deploy"
+        & "${{ github.workspace }}\scripts\prod.ps1" deploy
+
+    # --------------------------------------------------------------------
+    # OPTIONAL: Notify outcome in the logs
+    # --------------------------------------------------------------------
+    - name: Notify deployment status
+      if: always()
+      shell: powershell
+      run: |
+        if ("${{ job.status }}" -eq "success") {
+          Write-Host "✅ Deployment to ${{ steps.env.outputs.ENVIRONMENT }} was successful."
+        } else {
+          Write-Host "❌ Deployment failed."
+        }
