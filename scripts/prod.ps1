@@ -5,10 +5,15 @@ param(
     [string]$Action = "start"
 )
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectDir = Split-Path -Parent $ScriptDir
-
-Set-Location $ProjectDir
+# When called from GitHub Actions, respect the working-directory set by the workflow
+# Otherwise, use the script's location to find the project directory
+if ($env:GITHUB_WORKSPACE) {
+    $ProjectDir = Get-Location
+} else {
+    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $ProjectDir = Split-Path -Parent $ScriptDir
+    Set-Location $ProjectDir
+}
 
 switch ($Action.ToLower()) {
     "start" {
